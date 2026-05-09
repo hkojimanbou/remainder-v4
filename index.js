@@ -113,11 +113,11 @@ client.on('messageCreate', async (message) => {
                 await showPendingList(message.channel);
                 return;
             }
-            if (title.toLowerCase() === 'scheduled') {
+            if (title.toLowerCase() === 'scheduled' || title === 'まとめ') {
                 await showScheduledList(message.channel);
                 return;
             }
-            if (title.toLowerCase() === 'analyze') {
+            if (title.toLowerCase() === 'analyze' || title === '分析') {
                 const url = process.env.PUBLIC_URL || 'http://localhost:3000';
                 await message.reply(`📊 じぞーの分析ページはこちらです：\n${url}`);
                 return;
