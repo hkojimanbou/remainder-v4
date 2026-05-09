@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remainder Analytics</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="background"></div>
+    <div class="container">
+        <header>
+            <h1>Remainder Analytics</h1>
+            <div class="controls">
+                <select id="timeRange">
+                    <option value="all">全期間</option>
+                    <option value="1day">直近1日</option>
+                    <option value="1week">直近1週間</option>
+                </select>
+                <button id="refreshBtn">更新</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="glass-card analysis-card">
+                <h2>🤖 じぞーのデータ分析レポート</h2>
+                <div id="aiText" class="loading-pulse">データを分析中...</div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="glass-card">
+                    <h2>TODO 完了率</h2>
+                    <canvas id="completionChart"></canvas>
+                </div>
+                <div class="glass-card">
+                    <h2>アクション推移</h2>
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <div class="tables-grid">
+                <div class="glass-card">
+                    <h2>リスケランキング</h2>
+                    <table id="reschedTable">
+                        <thead><tr><th>タスク名</th><th>リスケ回数</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="glass-card">
+                    <h2>取止め傾向（時間帯）</h2>
+                    <table id="cancelTable">
+                        <thead><tr><th>時間帯</th><th>取止め回数</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
