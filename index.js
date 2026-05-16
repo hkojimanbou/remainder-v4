@@ -134,12 +134,13 @@ client.on('messageCreate', async (message) => {
                     [newTodo.id]
                 );
 
-                await message.reply(`TODO「${title}」を登録しました！`);
-                await showPendingList(message.channel);
-
+                try {
+                    await message.react('✅');
+                } catch (e) {
+                    // リアクション失敗時は無応答でよい
+                }
             } catch (err) {
                 console.error(err);
-                message.reply("TODOの保存に失敗しました。");
             }
         }
         return;
