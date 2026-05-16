@@ -137,7 +137,7 @@ async function showDashboard(channel) {
         const formatTodo = (t, type) => {
             let timeStr = "";
             if (type === 'pending') {
-                timeStr = new Date(t.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                timeStr = "登録: " + new Date(t.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             } else if (type === 'scheduled' || type === 'overdue') {
                 timeStr = new Date(t.scheduled_at).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             } else if (type === 'done') {
@@ -167,7 +167,7 @@ async function showDashboard(channel) {
             options.push(new StringSelectMenuOptionBuilder().setLabel(`[予定] ${t.title}`.substring(0, 100)).setValue(t.id.toString()));
         }
         for (const t of risukeTodos) {
-            options.push(new StringSelectMenuOptionBuilder().setLabel(`[リスケ] ${t.title}`.substring(0, 100)).setValue(t.id.toString()));
+            options.push(new StringSelectMenuOptionBuilder().setLabel(`[リスケする？] ${t.title}`.substring(0, 100)).setValue(t.id.toString()));
         }
 
         const finalOptions = options.slice(0, 25);
@@ -178,7 +178,7 @@ async function showDashboard(channel) {
         if (finalOptions.length > 0) {
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('dashboard_select_todo')
-                .setPlaceholder('操作するTODOを選択してください')
+                .setPlaceholder('📋 TODOを選択')
                 .addOptions(finalOptions);
             const row = new ActionRowBuilder().addComponents(selectMenu);
             await channel.send({ embeds: [embed], components: [row, closeBtnRow] });
@@ -298,7 +298,7 @@ client.on('interactionCreate', async interaction => {
 
                 const row = new ActionRowBuilder().addComponents(actionMenu);
                 await interaction.reply({ 
-                    content: `**#${todo.id} ${todo.title}** に対するアクションを選択してください：`, 
+                    content: `**#${todo.id} ${todo.title}**　実行するアクションを選択してください`, 
                     components: [row], 
                     ephemeral: true 
                 });
