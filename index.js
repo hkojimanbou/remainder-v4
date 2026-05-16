@@ -171,15 +171,19 @@ async function showDashboard(channel) {
         }
 
         const finalOptions = options.slice(0, 25);
+        const closeBtnRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('dashboard_close').setLabel('🏁 確認（閉じる）').setStyle(ButtonStyle.Secondary)
+        );
+
         if (finalOptions.length > 0) {
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('dashboard_select_todo')
                 .setPlaceholder('操作するTODOを選択してください')
                 .addOptions(finalOptions);
             const row = new ActionRowBuilder().addComponents(selectMenu);
-            await channel.send({ embeds: [embed], components: [row] });
+            await channel.send({ embeds: [embed], components: [row, closeBtnRow] });
         } else {
-            await channel.send({ embeds: [embed] });
+            await channel.send({ embeds: [embed], components: [closeBtnRow] });
         }
 
     } catch (err) {
@@ -377,6 +381,12 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.isButton()) {
             const customId = interaction.customId;
+
+            if (customId === 'dashboard_close') {
+                await interaction.deferUpdate().catch(console.error);
+                await interaction.message.delete().catch(console.error);
+                return;
+            }
 
             if (customId.startsWith('exec_')) {
                 const todoId = customId.split('_')[1];
