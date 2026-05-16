@@ -210,11 +210,11 @@ client.on('messageCreate', async (message) => {
                 await showPendingList(message.channel);
                 return;
             }
-            if (title.toLowerCase() === 'scheduled' || title === 'まとめ') {
+            if (title.toLowerCase() === 'scheduled') {
                 await showScheduledList(message.channel);
                 return;
             }
-            if (title === '予定' || title === '確認') {
+            if (title === '予定' || title === '確認' || title === '一覧' || title === 'まとめ' || title === '予定出して') {
                 await showDashboard(message.channel);
                 return;
             }
