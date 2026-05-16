@@ -223,10 +223,64 @@ client.on('messageCreate', async (message) => {
                 await message.reply(`📊 じぞーの分析ページはこちらです：\n${url}`);
                 return;
             }
+            const shortcutMatch = title.match(/^(.*?)[\s　]+(\d{12})$/);
+            let isShortcutValid = false;
+            let dateObj = null;
+            let cleanTitle = title;
+            
+            if (shortcutMatch) {
+                cleanTitle = shortcutMatch[1].trim();
+                const inputStr = shortcutMatch[2];
+                const year = parseInt(inputStr.substring(0, 4), 10);
+                const month = parseInt(inputStr.substring(4, 6), 10);
+                const day = parseInt(inputStr.substring(6, 8), 10);
+                const hour = parseInt(inputStr.substring(8, 10), 10);
+                const min = parseInt(inputStr.substring(10, 12), 10);
+                
+                const isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
+                dateObj = new Date(isoStr);
+                if (!isNaN(dateObj.getTime())) {
+                    isShortcutValid = true;
+                } else {
+                    cleanTitle = title;
+                }
+            }
+
+            if (isShortcutValid) {
+                try {
+                    const eventId = await calendar.addEvent(cleanTitle, dateObj.toISOString());
+                    if (!eventId) {
+                        await message.react('❌');
+                        return;
+                    }
+                    
+                    const res = await pool.query(
+                        "INSERT INTO todos (title, status, scheduled_at, calendar_event_id) VALUES ($1, 'scheduled', $2, $3) RETURNING *",
+                        [cleanTitle, dateObj.toISOString(), eventId]
+                    );
+                    const newTodo = res.rows[0];
+                    
+                    await pool.query(
+                        "INSERT INTO actions (todo_id, action_type) VALUES ($1, 'created')",
+                        [newTodo.id]
+                    );
+                    await pool.query(
+                        "INSERT INTO actions (todo_id, action_type, action_at) VALUES ($1, 'scheduled', CURRENT_TIMESTAMP)",
+                        [newTodo.id]
+                    );
+
+                    await message.react('✅');
+                } catch (err) {
+                    console.error(err);
+                    await message.react('❌');
+                }
+                return;
+            }
+
             try {
                 const res = await pool.query(
                     "INSERT INTO todos (title, status) VALUES ($1, 'pending') RETURNING *",
-                    [title]
+                    [cleanTitle]
                 );
                 const newTodo = res.rows[0];
                 
