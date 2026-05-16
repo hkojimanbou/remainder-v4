@@ -398,12 +398,11 @@ client.on('interactionCreate', async interaction => {
                         .setTitle('日時を設定して予定化');
                     const datetimeInput = new TextInputBuilder()
                         .setCustomId('datetimeInput')
-                        .setLabel('4桁(HHmm) / 8桁(MMDD..) / 12桁で入力')
+                        .setLabel('4/8/12桁 または 未入力で現在時刻')
                         .setStyle(TextInputStyle.Short)
-                        .setRequired(true)
-                        .setMinLength(4)
-                        .setMaxLength(12)
-                        .setValue(initialValue);
+                        .setRequired(false)
+                        .setPlaceholder(`未入力なら ${initialValue}`)
+                        .setMaxLength(12);
                     modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
                     await interaction.showModal(modal);
                     return;
@@ -419,12 +418,11 @@ client.on('interactionCreate', async interaction => {
                         .setTitle('新しい日時を設定してリスケ');
                     const datetimeInput = new TextInputBuilder()
                         .setCustomId('datetimeInput')
-                        .setLabel('4桁(HHmm) / 8桁(MMDD..) / 12桁で入力')
+                        .setLabel('4/8/12桁 または 未入力で現在時刻')
                         .setStyle(TextInputStyle.Short)
-                        .setRequired(true)
-                        .setMinLength(4)
-                        .setMaxLength(12)
-                        .setValue(initialValue);
+                        .setRequired(false)
+                        .setPlaceholder(`未入力なら ${initialValue}`)
+                        .setMaxLength(12);
                     modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
                     await interaction.showModal(modal);
                     return;
@@ -480,12 +478,11 @@ client.on('interactionCreate', async interaction => {
 
                 const datetimeInput = new TextInputBuilder()
                     .setCustomId('datetimeInput')
-                    .setLabel('4桁(HHmm) / 8桁(MMDD..) / 12桁で入力')
+                    .setLabel('4/8/12桁 または 未入力で現在時刻')
                     .setStyle(TextInputStyle.Short)
-                    .setRequired(true)
-                    .setMinLength(4)
-                    .setMaxLength(12)
-                    .setValue(initialValue);
+                    .setRequired(false)
+                    .setPlaceholder(`未入力なら ${initialValue}`)
+                    .setMaxLength(12);
 
                 const firstActionRow = new ActionRowBuilder().addComponents(datetimeInput);
                 modal.addComponents(firstActionRow);
@@ -580,12 +577,11 @@ client.on('interactionCreate', async interaction => {
 
                 const datetimeInput = new TextInputBuilder()
                     .setCustomId('datetimeInput')
-                    .setLabel('4桁(HHmm) / 8桁(MMDD..) / 12桁で入力')
+                    .setLabel('4/8/12桁 または 未入力で現在時刻')
                     .setStyle(TextInputStyle.Short)
-                    .setRequired(true)
-                    .setMinLength(4)
-                    .setMaxLength(12)
-                    .setValue(initialValue);
+                    .setRequired(false)
+                    .setPlaceholder(`未入力なら ${initialValue}`)
+                    .setMaxLength(12);
 
                 const firstActionRow = new ActionRowBuilder().addComponents(datetimeInput);
                 modal.addComponents(firstActionRow);
@@ -645,16 +641,23 @@ client.on('interactionCreate', async interaction => {
             if (interaction.customId.startsWith('modal_exec_') || interaction.customId.startsWith('modal_resched_')) {
                 const isResched = interaction.customId.startsWith('modal_resched_');
                 const todoId = interaction.customId.split('_')[2];
-                const inputStr = interaction.fields.getTextInputValue('datetimeInput');
+                let inputStr = interaction.fields.getTextInputValue('datetimeInput').trim();
                 
+                const now = new Date();
+                const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+                const jstNow = new Date(utc + 9 * 3600000);
+                
+                if (!inputStr) {
+                    inputStr = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
+                }
+
                 if (!/^(\d{4}|\d{8}|\d{12})$/.test(inputStr)) {
                     return interaction.reply({ content: '❌ フォーマットが間違っています。4桁、8桁、または12桁の半角数字で入力してください。', ephemeral: true });
                 }
                 
-                const now = new Date();
-                let year = now.getFullYear();
-                let month = now.getMonth() + 1;
-                let day = now.getDate();
+                let year = jstNow.getFullYear();
+                let month = jstNow.getMonth() + 1;
+                let day = jstNow.getDate();
                 let hour = 0;
                 let min = 0;
 
