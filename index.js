@@ -95,6 +95,78 @@ async function showScheduledList(channel) {
     }
 }
 
+async function showDashboard(channel) {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    try {
+        const pendingRes = await pool.query("SELECT * FROM todos WHERE status = 'pending' ORDER BY created_at ASC");
+        const pendingTodos = pendingRes.rows;
+
+        const scheduledRes = await pool.query(
+            "SELECT * FROM todos WHERE status = 'scheduled' AND scheduled_at >= $1 AND scheduled_at <= $2 ORDER BY scheduled_at ASC",
+            [todayStart.toISOString(), todayEnd.toISOString()]
+        );
+        const allScheduledToday = scheduledRes.rows;
+
+        const scheduledTodos = [];
+        const overdueTodos = [];
+        for (const t of allScheduledToday) {
+            if (new Date(t.scheduled_at) >= now) {
+                scheduledTodos.push(t);
+            } else {
+                overdueTodos.push(t);
+            }
+        }
+
+        const doneRes = await pool.query(`
+            SELECT t.* FROM todos t 
+            WHERE t.status = 'done' 
+            AND EXISTS (
+                SELECT 1 FROM actions a 
+                WHERE a.todo_id = t.id 
+                AND a.action_type = 'done' 
+                AND a.action_at >= $1 AND a.action_at <= $2
+            )
+        `, [todayStart.toISOString(), todayEnd.toISOString()]);
+        const doneTodos = doneRes.rows;
+        
+        const risukeTodos = [...overdueTodos, ...doneTodos];
+
+        const formatTodo = (t, type) => {
+            let timeStr = "";
+            if (type === 'pending') {
+                timeStr = new Date(t.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            } else if (type === 'scheduled' || type === 'overdue') {
+                timeStr = new Date(t.scheduled_at).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            } else if (type === 'done') {
+                timeStr = t.scheduled_at ? new Date(t.scheduled_at).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : "未定";
+            }
+            return `#${t.id} ${t.title} (${timeStr})`;
+        };
+
+        const pendingText = pendingTodos.length > 0 ? pendingTodos.map(t => formatTodo(t, 'pending')).join('\n') : "なし";
+        const scheduledText = scheduledTodos.length > 0 ? scheduledTodos.map(t => formatTodo(t, 'scheduled')).join('\n') : "なし";
+        const risukeText = risukeTodos.length > 0 ? risukeTodos.map(t => formatTodo(t, t.status === 'done' ? 'done' : 'overdue')).join('\n') : "なし";
+
+        const embed = new EmbedBuilder()
+            .setTitle('📋 統合ダッシュボード')
+            .setColor(0x0099FF)
+            .addFields(
+                { name: '📝 未定', value: pendingText },
+                { name: '📅 予定', value: scheduledText },
+                { name: '🔄 リスケ', value: risukeText }
+            );
+
+        await channel.send({ embeds: [embed] });
+
+    } catch (err) {
+        console.error("Dashboard DB Error:", err);
+        channel.send("データベースエラーが発生しました。");
+    }
+}
+
 client.once('ready', () => {
     console.log(`ログイン完了: ${client.user.tag} がオンラインになりました！`);
 });
@@ -115,6 +187,10 @@ client.on('messageCreate', async (message) => {
             }
             if (title.toLowerCase() === 'scheduled' || title === 'まとめ') {
                 await showScheduledList(message.channel);
+                return;
+            }
+            if (title === '予定' || title === '確認') {
+                await showDashboard(message.channel);
                 return;
             }
             if (title.toLowerCase() === 'analyze' || title === '分析') {
