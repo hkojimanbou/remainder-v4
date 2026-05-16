@@ -178,10 +178,19 @@ async function showDashboard(channel) {
         if (finalOptions.length > 0) {
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('dashboard_select_todo')
-                .setPlaceholder('📋 TODOを選択')
+                .setPlaceholder('📋 アクションを実行するTODOを選択')
                 .addOptions(finalOptions);
-            const row = new ActionRowBuilder().addComponents(selectMenu);
-            await channel.send({ embeds: [embed], components: [row, closeBtnRow] });
+            const row1 = new ActionRowBuilder().addComponents(selectMenu);
+
+            const bulkCancelMenu = new StringSelectMenuBuilder()
+                .setCustomId('dashboard_bulk_cancel')
+                .setPlaceholder('🗑️ 一括取止めするTODOを複数選択')
+                .setMinValues(1)
+                .setMaxValues(finalOptions.length)
+                .addOptions(finalOptions);
+            const row2 = new ActionRowBuilder().addComponents(bulkCancelMenu);
+
+            await channel.send({ embeds: [embed], components: [row1, row2, closeBtnRow] });
         } else {
             await channel.send({ embeds: [embed], components: [closeBtnRow] });
         }
@@ -327,6 +336,33 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async interaction => {
     try {
         if (interaction.isStringSelectMenu()) {
+            if (interaction.customId === 'dashboard_bulk_cancel') {
+                const todoIds = interaction.values;
+                await interaction.reply({ content: '⏳ 一括取止め処理中...', ephemeral: true });
+
+                for (const todoId of todoIds) {
+                    const res = await pool.query("SELECT calendar_event_id FROM todos WHERE id = $1", [todoId]);
+                    if (res.rows.length > 0 && res.rows[0].calendar_event_id) {
+                        try {
+                            await calendar.deleteEvent(res.rows[0].calendar_event_id);
+                        } catch (e) {
+                            console.error('Calendar bulk delete error:', e);
+                        }
+                    }
+                    await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
+                    await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
+                }
+
+                await interaction.message.edit({
+                    content: `🗑️ ${todoIds.length}件のTODOを一括で取り止めました！`,
+                    embeds: [],
+                    components: []
+                });
+                
+                await interaction.deleteReply().catch(() => {});
+                return;
+            }
+
             if (interaction.customId === 'dashboard_select_todo') {
                 const todoId = interaction.values[0];
                 const res = await pool.query("SELECT * FROM todos WHERE id = $1", [todoId]);
