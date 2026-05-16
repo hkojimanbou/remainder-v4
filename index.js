@@ -95,7 +95,7 @@ async function showScheduledList(channel) {
     }
 }
 
-async function showDashboard(channel) {
+async function showDashboard(channel, messageToEdit = null) {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
     const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -190,9 +190,21 @@ async function showDashboard(channel) {
                 .addOptions(finalOptions);
             const row2 = new ActionRowBuilder().addComponents(bulkCancelMenu);
 
-            await channel.send({ embeds: [embed], components: [row1, row2, closeBtnRow] });
+            if (messageToEdit) {
+                await messageToEdit.edit({ content: '', embeds: [embed], components: [row1, row2, closeBtnRow] }).catch(async () => {
+                    await channel.send({ embeds: [embed], components: [row1, row2, closeBtnRow] });
+                });
+            } else {
+                await channel.send({ embeds: [embed], components: [row1, row2, closeBtnRow] });
+            }
         } else {
-            await channel.send({ embeds: [embed], components: [closeBtnRow] });
+            if (messageToEdit) {
+                await messageToEdit.edit({ content: '', embeds: [embed], components: [closeBtnRow] }).catch(async () => {
+                    await channel.send({ embeds: [embed], components: [closeBtnRow] });
+                });
+            } else {
+                await channel.send({ embeds: [embed], components: [closeBtnRow] });
+            }
         }
 
     } catch (err) {
@@ -357,13 +369,9 @@ client.on('interactionCreate', async interaction => {
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
                 }
 
-                await interaction.message.edit({
-                    content: `🗑️ ${todoIds.length}件のTODOを一括で取り止めました！`,
-                    embeds: [],
-                    components: []
-                });
-                
-                await interaction.deleteReply().catch(() => {});
+                await interaction.editReply(`🗑️ ${todoIds.length}件のTODOを一括で取り止めました！`);
+                await showDashboard(interaction.channel, interaction.message);
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
 
@@ -371,7 +379,9 @@ client.on('interactionCreate', async interaction => {
                 const todoId = interaction.values[0];
                 const res = await pool.query("SELECT * FROM todos WHERE id = $1", [todoId]);
                 if (res.rows.length === 0) {
-                    return interaction.reply({ content: '❌ TODOが見つかりません。', ephemeral: true });
+                    await interaction.reply({ content: '❌ TODOが見つかりません。', ephemeral: true });
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
                 const todo = res.rows[0];
                 const now = new Date();
@@ -472,8 +482,9 @@ client.on('interactionCreate', async interaction => {
 
                 if (action === 'hold') {
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'held')", [todoId]);
-                    await interaction.update({ content: `⏸️ TODO #${todoId} を保留（後回し）にしました。`, components: [] });
-                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    await interaction.reply({ content: `⏸️ TODO #${todoId} を保留（後回し）にしました。`, ephemeral: true });
+                    await showDashboard(interaction.channel, interaction.message);
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                     return;
                 }
 
@@ -484,16 +495,18 @@ client.on('interactionCreate', async interaction => {
                     }
                     await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
-                    await interaction.update({ content: `❌ TODO #${todoId} を取り止めました。`, components: [] });
-                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    await interaction.reply({ content: `❌ TODO #${todoId} を取り止めました。`, ephemeral: true });
+                    await showDashboard(interaction.channel, interaction.message);
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                     return;
                 }
 
                 if (action === 'done' || action === 'fulldone') {
                     await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
-                    await interaction.update({ content: `✅ TODO #${todoId} を完了にしました！お疲れ様です！`, components: [] });
-                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    await interaction.reply({ content: `✅ TODO #${todoId} を完了にしました！お疲れ様です！`, ephemeral: true });
+                    await showDashboard(interaction.channel, interaction.message);
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                     return;
                 }
             }
@@ -549,13 +562,17 @@ client.on('interactionCreate', async interaction => {
 
                 const res = await pool.query("SELECT title FROM todos WHERE id = $1", [todoId]);
                 if (res.rows.length === 0) {
-                    return interaction.editReply('❌ TODOが見つかりません。');
+                    await interaction.editReply('❌ TODOが見つかりません。');
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
                 const title = res.rows[0].title;
 
                 const eventId = await calendar.addEvent(title, dateObj.toISOString());
                 if (!eventId) {
-                    return interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
+                    await interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
 
                 await pool.query(
@@ -568,11 +585,14 @@ client.on('interactionCreate', async interaction => {
                 );
 
                 await interaction.editReply(`✅ Googleカレンダーに予定を登録し、予定済み一覧へ移動しました！`);
+                await showDashboard(interaction.channel, interaction.message);
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
 
             if (customId.startsWith('cancelexec_')) {
                 await interaction.reply({ content: '予定化をキャンセルしました。', ephemeral: true });
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
                 return;
             }
 
@@ -584,6 +604,8 @@ client.on('interactionCreate', async interaction => {
                     [todoId]
                 );
                 await interaction.reply({ content: `🗑️ TODO #${todoId} を取り止めました。`, ephemeral: true });
+                await interaction.message.delete().catch(() => {});
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
 
@@ -593,6 +615,8 @@ client.on('interactionCreate', async interaction => {
                 await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
                 await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
                 await interaction.reply({ content: `✅ TODO #${todoId} を「完了」にしました！お疲れ様です！`, ephemeral: true });
+                await interaction.message.delete().catch(() => {});
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
 
@@ -605,6 +629,8 @@ client.on('interactionCreate', async interaction => {
                 await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
                 await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
                 await interaction.reply({ content: `🗑️ TODO #${todoId} を取り止め、カレンダーからも削除しました。`, ephemeral: true });
+                await interaction.message.delete().catch(() => {});
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
 
@@ -649,17 +675,23 @@ client.on('interactionCreate', async interaction => {
 
                 const res = await pool.query("SELECT title, calendar_event_id, scheduled_at FROM todos WHERE id = $1", [todoId]);
                 if (res.rows.length === 0) {
-                    return interaction.editReply('❌ TODOが見つかりません。');
+                    await interaction.editReply('❌ TODOが見つかりません。');
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
                 const { title, calendar_event_id, scheduled_at } = res.rows[0];
 
                 if (!calendar_event_id) {
-                    return interaction.editReply('❌ 連携されたカレンダー情報が見つかりません。');
+                    await interaction.editReply('❌ 連携されたカレンダー情報が見つかりません。');
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
 
                 const success = await calendar.updateEvent(calendar_event_id, title, newDateObj.toISOString());
                 if (!success) {
-                    return interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
+                    await interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
 
                 await pool.query(
@@ -672,11 +704,14 @@ client.on('interactionCreate', async interaction => {
                 );
 
                 await interaction.editReply(`✅ Googleカレンダーの予定を新しい日時にリスケしました！`);
+                await showDashboard(interaction.channel, interaction.message);
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
 
             if (customId.startsWith('cancelresched_')) {
                 await interaction.reply({ content: 'リスケをキャンセルしました。', ephemeral: true });
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
                 return;
             }
         }
@@ -696,7 +731,9 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 if (!/^(\d{4}|\d{8}|\d{12})$/.test(inputStr)) {
-                    return interaction.reply({ content: '❌ フォーマットが間違っています。4桁、8桁、または12桁の半角数字で入力してください。', ephemeral: true });
+                    await interaction.reply({ content: '❌ フォーマットが間違っています。4桁、8桁、または12桁の半角数字で入力してください。', ephemeral: true });
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
                 
                 let year = jstNow.getFullYear();
@@ -724,24 +761,32 @@ client.on('interactionCreate', async interaction => {
                 const isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
                 const dateObj = new Date(isoStr);
                 if (isNaN(dateObj.getTime())) {
-                    return interaction.reply({ content: '❌ 無効な日時です。', ephemeral: true });
+                    await interaction.reply({ content: '❌ 無効な日時です。', ephemeral: true });
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
 
                 await interaction.deferReply({ ephemeral: true });
 
                 const res = await pool.query("SELECT title, calendar_event_id, scheduled_at FROM todos WHERE id = $1", [todoId]);
                 if (res.rows.length === 0) {
-                    return interaction.editReply('❌ TODOが見つかりません。');
+                    await interaction.editReply('❌ TODOが見つかりません。');
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
                 }
                 const { title, calendar_event_id, scheduled_at } = res.rows[0];
 
                 if (isResched) {
                     if (!calendar_event_id) {
-                        return interaction.editReply('❌ 連携されたカレンダー情報が見つかりません。');
+                        await interaction.editReply('❌ 連携されたカレンダー情報が見つかりません。');
+                        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                        return;
                     }
                     const success = await calendar.updateEvent(calendar_event_id, title, dateObj.toISOString());
                     if (!success) {
-                        return interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
+                        await interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
+                        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                        return;
                     }
                     await pool.query(
                         "UPDATE todos SET scheduled_at = $1 WHERE id = $2",
@@ -754,7 +799,9 @@ client.on('interactionCreate', async interaction => {
                 } else {
                     const eventId = await calendar.addEvent(title, dateObj.toISOString());
                     if (!eventId) {
-                        return interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
+                        await interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
+                        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                        return;
                     }
                     await pool.query(
                         "UPDATE todos SET status = 'scheduled', scheduled_at = $1, calendar_event_id = $2 WHERE id = $3",
@@ -776,7 +823,8 @@ client.on('interactionCreate', async interaction => {
                 } else {
                     await interaction.editReply(`✅ ${timeMsg} でGoogleカレンダーに予定を登録し、予定済み一覧へ移動しました！`);
                 }
-                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                await showDashboard(interaction.channel, interaction.message);
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
         }
@@ -784,6 +832,7 @@ client.on('interactionCreate', async interaction => {
         console.error("Interaction Error:", err);
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({ content: "エラーが発生しました。", ephemeral: true });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
         }
     }
 });
