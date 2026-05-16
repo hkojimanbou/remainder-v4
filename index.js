@@ -393,15 +393,16 @@ client.on('interactionCreate', async interaction => {
                     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
                     const jstNow = new Date(utc + (9 * 3600000));
                     const initialValue = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
+                    const displayNow = `${jstNow.getFullYear()}/${(jstNow.getMonth() + 1).toString().padStart(2, '0')}/${jstNow.getDate().toString().padStart(2, '0')} ${jstNow.getHours().toString().padStart(2, '0')}:${jstNow.getMinutes().toString().padStart(2, '0')}`;
                     const modal = new ModalBuilder()
                         .setCustomId(`modal_exec_${todoId}`)
                         .setTitle('日時を設定して予定化');
                     const datetimeInput = new TextInputBuilder()
                         .setCustomId('datetimeInput')
-                        .setLabel('4/8/12桁 または 未入力で現在時刻')
+                        .setLabel(`現在: ${displayNow} (空欄で適用)`)
                         .setStyle(TextInputStyle.Short)
                         .setRequired(false)
-                        .setPlaceholder(`未入力なら ${initialValue}`)
+                        .setPlaceholder(`例: 1234 (4/8/12桁)`)
                         .setMaxLength(12);
                     modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
                     await interaction.showModal(modal);
@@ -413,15 +414,16 @@ client.on('interactionCreate', async interaction => {
                     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
                     const jstNow = new Date(utc + (9 * 3600000));
                     const initialValue = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
+                    const displayNow = `${jstNow.getFullYear()}/${(jstNow.getMonth() + 1).toString().padStart(2, '0')}/${jstNow.getDate().toString().padStart(2, '0')} ${jstNow.getHours().toString().padStart(2, '0')}:${jstNow.getMinutes().toString().padStart(2, '0')}`;
                     const modal = new ModalBuilder()
                         .setCustomId(`modal_resched_${todoId}`)
                         .setTitle('新しい日時を設定してリスケ');
                     const datetimeInput = new TextInputBuilder()
                         .setCustomId('datetimeInput')
-                        .setLabel('4/8/12桁 または 未入力で現在時刻')
+                        .setLabel(`現在: ${displayNow} (空欄で適用)`)
                         .setStyle(TextInputStyle.Short)
                         .setRequired(false)
-                        .setPlaceholder(`未入力なら ${initialValue}`)
+                        .setPlaceholder(`例: 1234 (4/8/12桁)`)
                         .setMaxLength(12);
                     modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
                     await interaction.showModal(modal);
@@ -472,16 +474,17 @@ client.on('interactionCreate', async interaction => {
                 const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
                 const jstNow = new Date(utc + (9 * 3600000));
                 const initialValue = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
+                const displayNow = `${jstNow.getFullYear()}/${(jstNow.getMonth() + 1).toString().padStart(2, '0')}/${jstNow.getDate().toString().padStart(2, '0')} ${jstNow.getHours().toString().padStart(2, '0')}:${jstNow.getMinutes().toString().padStart(2, '0')}`;
                 const modal = new ModalBuilder()
                     .setCustomId(`modal_exec_${todoId}`)
                     .setTitle('日時を設定して予定化');
 
                 const datetimeInput = new TextInputBuilder()
                     .setCustomId('datetimeInput')
-                    .setLabel('4/8/12桁 または 未入力で現在時刻')
+                    .setLabel(`現在: ${displayNow} (空欄で適用)`)
                     .setStyle(TextInputStyle.Short)
                     .setRequired(false)
-                    .setPlaceholder(`未入力なら ${initialValue}`)
+                    .setPlaceholder(`例: 1234 (4/8/12桁)`)
                     .setMaxLength(12);
 
                 const firstActionRow = new ActionRowBuilder().addComponents(datetimeInput);
@@ -571,16 +574,17 @@ client.on('interactionCreate', async interaction => {
                 const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
                 const jstNow = new Date(utc + (9 * 3600000));
                 const initialValue = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
+                const displayNow = `${jstNow.getFullYear()}/${(jstNow.getMonth() + 1).toString().padStart(2, '0')}/${jstNow.getDate().toString().padStart(2, '0')} ${jstNow.getHours().toString().padStart(2, '0')}:${jstNow.getMinutes().toString().padStart(2, '0')}`;
                 const modal = new ModalBuilder()
                     .setCustomId(`modal_resched_${todoId}`)
                     .setTitle('新しい日時を設定してリスケ');
 
                 const datetimeInput = new TextInputBuilder()
                     .setCustomId('datetimeInput')
-                    .setLabel('4/8/12桁 または 未入力で現在時刻')
+                    .setLabel(`現在: ${displayNow} (空欄で適用)`)
                     .setStyle(TextInputStyle.Short)
                     .setRequired(false)
-                    .setPlaceholder(`未入力なら ${initialValue}`)
+                    .setPlaceholder(`例: 1234 (4/8/12桁)`)
                     .setMaxLength(12);
 
                 const firstActionRow = new ActionRowBuilder().addComponents(datetimeInput);
