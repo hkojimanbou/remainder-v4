@@ -300,6 +300,69 @@ client.on('interactionCreate', async interaction => {
                 });
                 return;
             }
+
+            if (interaction.customId === 'dashboard_action_select') {
+                const actionValue = interaction.values[0];
+                const parts = actionValue.split('_');
+                const action = parts[1];
+                const todoId = parts[2];
+
+                if (action === 'plan') {
+                    const modal = new ModalBuilder()
+                        .setCustomId(`modal_exec_${todoId}`)
+                        .setTitle('日時を設定して予定化');
+                    const datetimeInput = new TextInputBuilder()
+                        .setCustomId('datetimeInput')
+                        .setLabel('日時を12桁の数字で入力 (例: 202605101430)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(true)
+                        .setMinLength(12)
+                        .setMaxLength(12);
+                    modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
+                    await interaction.showModal(modal);
+                    return;
+                }
+
+                if (action === 'change' || action === 'resched') {
+                    const modal = new ModalBuilder()
+                        .setCustomId(`modal_resched_${todoId}`)
+                        .setTitle('新しい日時を設定してリスケ');
+                    const datetimeInput = new TextInputBuilder()
+                        .setCustomId('datetimeInput')
+                        .setLabel('新しい日時を12桁の数字で入力')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(true)
+                        .setMinLength(12)
+                        .setMaxLength(12);
+                    modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
+                    await interaction.showModal(modal);
+                    return;
+                }
+
+                if (action === 'hold') {
+                    await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'held')", [todoId]);
+                    await interaction.update({ content: `⏸️ TODO #${todoId} を保留（後回し）にしました。`, components: [] });
+                    return;
+                }
+
+                if (action === 'cancel') {
+                    const res = await pool.query("SELECT calendar_event_id FROM todos WHERE id = $1", [todoId]);
+                    if (res.rows.length > 0 && res.rows[0].calendar_event_id) {
+                        await calendar.deleteEvent(res.rows[0].calendar_event_id);
+                    }
+                    await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
+                    await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
+                    await interaction.update({ content: `❌ TODO #${todoId} を取り止めました。`, components: [] });
+                    return;
+                }
+
+                if (action === 'done' || action === 'fulldone') {
+                    await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
+                    await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
+                    await interaction.update({ content: `✅ TODO #${todoId} を完了にしました！お疲れ様です！`, components: [] });
+                    return;
+                }
+            }
         }
 
         if (interaction.isButton()) {
