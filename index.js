@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { pool } = require('./db');
 const calendar = require('./calendar');
 const { startServer } = require('./web');
@@ -159,7 +159,28 @@ async function showDashboard(channel) {
                 { name: '🔄 リスケ', value: risukeText }
             );
 
-        await channel.send({ embeds: [embed] });
+        const options = [];
+        for (const t of pendingTodos) {
+            options.push(new StringSelectMenuOptionBuilder().setLabel(`[未定] ${t.title}`.substring(0, 100)).setValue(t.id.toString()));
+        }
+        for (const t of scheduledTodos) {
+            options.push(new StringSelectMenuOptionBuilder().setLabel(`[予定] ${t.title}`.substring(0, 100)).setValue(t.id.toString()));
+        }
+        for (const t of risukeTodos) {
+            options.push(new StringSelectMenuOptionBuilder().setLabel(`[リスケ] ${t.title}`.substring(0, 100)).setValue(t.id.toString()));
+        }
+
+        const finalOptions = options.slice(0, 25);
+        if (finalOptions.length > 0) {
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('dashboard_select_todo')
+                .setPlaceholder('操作するTODOを選択してください')
+                .addOptions(finalOptions);
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+            await channel.send({ embeds: [embed], components: [row] });
+        } else {
+            await channel.send({ embeds: [embed] });
+        }
 
     } catch (err) {
         console.error("Dashboard DB Error:", err);
