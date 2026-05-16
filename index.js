@@ -309,7 +309,9 @@ client.on('interactionCreate', async interaction => {
 
                 if (action === 'plan') {
                     const now = new Date();
-                    const initialValue = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+                    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                    const jstNow = new Date(utc + (9 * 3600000));
+                    const initialValue = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
                     const modal = new ModalBuilder()
                         .setCustomId(`modal_exec_${todoId}`)
                         .setTitle('日時を設定して予定化');
@@ -328,7 +330,9 @@ client.on('interactionCreate', async interaction => {
 
                 if (action === 'change' || action === 'resched') {
                     const now = new Date();
-                    const initialValue = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+                    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                    const jstNow = new Date(utc + (9 * 3600000));
+                    const initialValue = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
                     const modal = new ModalBuilder()
                         .setCustomId(`modal_resched_${todoId}`)
                         .setTitle('新しい日時を設定してリスケ');
@@ -377,7 +381,9 @@ client.on('interactionCreate', async interaction => {
             if (customId.startsWith('exec_')) {
                 const todoId = customId.split('_')[1];
                 const now = new Date();
-                const initialValue = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+                const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                const jstNow = new Date(utc + (9 * 3600000));
+                const initialValue = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
                 const modal = new ModalBuilder()
                     .setCustomId(`modal_exec_${todoId}`)
                     .setTitle('日時を設定して予定化');
@@ -475,7 +481,9 @@ client.on('interactionCreate', async interaction => {
             if (customId.startsWith('resched_')) {
                 const todoId = customId.split('_')[1];
                 const now = new Date();
-                const initialValue = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+                const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                const jstNow = new Date(utc + (9 * 3600000));
+                const initialValue = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
                 const modal = new ModalBuilder()
                     .setCustomId(`modal_resched_${todoId}`)
                     .setTitle('新しい日時を設定してリスケ');
