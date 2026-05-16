@@ -342,7 +342,7 @@ client.on('interactionCreate', async interaction => {
         if (interaction.isStringSelectMenu()) {
             if (interaction.customId === 'dashboard_bulk_cancel') {
                 const todoIds = interaction.values;
-                await interaction.reply({ content: '⏳ 一括取止め処理中...', ephemeral: true });
+                await interaction.deferReply({ ephemeral: true });
 
                 for (const todoId of todoIds) {
                     const res = await pool.query("SELECT calendar_event_id FROM todos WHERE id = $1", [todoId]);
@@ -538,7 +538,7 @@ client.on('interactionCreate', async interaction => {
                 const todoId = parts[1];
                 const inputStr = parts[2];
 
-                await interaction.reply({ content: '⏳ Googleカレンダーに登録しています...', ephemeral: true });
+                await interaction.deferReply({ ephemeral: true });
 
                 const year = inputStr.substring(0, 4);
                 const month = inputStr.substring(4, 6);
@@ -638,7 +638,7 @@ client.on('interactionCreate', async interaction => {
                 const todoId = parts[1];
                 const inputStr = parts[2];
 
-                await interaction.reply({ content: '⏳ Googleカレンダーを更新しています...', ephemeral: true });
+                await interaction.deferReply({ ephemeral: true });
 
                 const year = inputStr.substring(0, 4);
                 const month = inputStr.substring(4, 6);
@@ -727,7 +727,7 @@ client.on('interactionCreate', async interaction => {
                     return interaction.reply({ content: '❌ 無効な日時です。', ephemeral: true });
                 }
 
-                await interaction.reply({ content: '⏳ Googleカレンダーに登録しています...', ephemeral: true });
+                await interaction.deferReply({ ephemeral: true });
 
                 const res = await pool.query("SELECT title, calendar_event_id, scheduled_at FROM todos WHERE id = $1", [todoId]);
                 if (res.rows.length === 0) {
