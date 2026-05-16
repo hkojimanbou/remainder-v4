@@ -246,6 +246,62 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async interaction => {
     try {
+        if (interaction.isStringSelectMenu()) {
+            if (interaction.customId === 'dashboard_select_todo') {
+                const todoId = interaction.values[0];
+                const res = await pool.query("SELECT * FROM todos WHERE id = $1", [todoId]);
+                if (res.rows.length === 0) {
+                    return interaction.reply({ content: '❌ TODOが見つかりません。', ephemeral: true });
+                }
+                const todo = res.rows[0];
+                const now = new Date();
+
+                let category = 'pending';
+                if (todo.status === 'scheduled') {
+                    if (new Date(todo.scheduled_at) < now) {
+                        category = 'overdue';
+                    } else {
+                        category = 'scheduled';
+                    }
+                } else if (todo.status === 'done') {
+                    category = 'done';
+                }
+
+                const options = [];
+                if (category === 'pending') {
+                    options.push(
+                        new StringSelectMenuOptionBuilder().setLabel('🗓️ 計画する').setValue(`action_plan_${todoId}`),
+                        new StringSelectMenuOptionBuilder().setLabel('⏸️ 保留（後回し）').setValue(`action_hold_${todoId}`),
+                        new StringSelectMenuOptionBuilder().setLabel('❌ 取止め').setValue(`action_cancel_${todoId}`)
+                    );
+                } else if (category === 'scheduled') {
+                    options.push(
+                        new StringSelectMenuOptionBuilder().setLabel('✅ 完了にする').setValue(`action_done_${todoId}`),
+                        new StringSelectMenuOptionBuilder().setLabel('🔄 変更する').setValue(`action_change_${todoId}`),
+                        new StringSelectMenuOptionBuilder().setLabel('❌ 取止め').setValue(`action_cancel_${todoId}`)
+                    );
+                } else if (category === 'overdue' || category === 'done') {
+                    options.push(
+                        new StringSelectMenuOptionBuilder().setLabel('✅ 完全に完了').setValue(`action_fulldone_${todoId}`),
+                        new StringSelectMenuOptionBuilder().setLabel('🔄 再リスケ').setValue(`action_resched_${todoId}`)
+                    );
+                }
+
+                const actionMenu = new StringSelectMenuBuilder()
+                    .setCustomId('dashboard_action_select')
+                    .setPlaceholder('実行するアクションを選択してください')
+                    .addOptions(options);
+
+                const row = new ActionRowBuilder().addComponents(actionMenu);
+                await interaction.reply({ 
+                    content: `**#${todo.id} ${todo.title}** に対するアクションを選択してください：`, 
+                    components: [row], 
+                    ephemeral: true 
+                });
+                return;
+            }
+        }
+
         if (interaction.isButton()) {
             const customId = interaction.customId;
 
