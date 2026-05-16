@@ -156,7 +156,7 @@ async function showDashboard(channel) {
             .addFields(
                 { name: '📝 未定', value: pendingText },
                 { name: '📅 予定', value: scheduledText },
-                { name: '🔄 リスケ', value: risukeText }
+                { name: '🔄 リスケする？', value: risukeText }
             );
 
         const options = [];
