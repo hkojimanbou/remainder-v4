@@ -223,7 +223,7 @@ client.on('messageCreate', async (message) => {
                 await message.reply(`📊 じぞーの分析ページはこちらです：\n${url}`);
                 return;
             }
-            const shortcutMatch = title.match(/^(.*?)[\s　]+(\d{12})$/);
+            const shortcutMatch = title.match(/^(.*?)(?:[\s　]+)?(\d{4}|\d{8}|\d{12})$/);
             let isShortcutValid = false;
             let dateObj = null;
             let cleanTitle = title;
@@ -231,15 +231,37 @@ client.on('messageCreate', async (message) => {
             if (shortcutMatch) {
                 cleanTitle = shortcutMatch[1].trim();
                 const inputStr = shortcutMatch[2];
-                const year = parseInt(inputStr.substring(0, 4), 10);
-                const month = parseInt(inputStr.substring(4, 6), 10);
-                const day = parseInt(inputStr.substring(6, 8), 10);
-                const hour = parseInt(inputStr.substring(8, 10), 10);
-                const min = parseInt(inputStr.substring(10, 12), 10);
+                
+                const now = new Date();
+                const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+                const jstNow = new Date(utc + 9 * 3600000);
+
+                let year = jstNow.getFullYear();
+                let month = jstNow.getMonth() + 1;
+                let day = jstNow.getDate();
+                let hour = 0;
+                let min = 0;
+
+                if (inputStr.length === 4) {
+                    hour = parseInt(inputStr.substring(0, 2), 10);
+                    min = parseInt(inputStr.substring(2, 4), 10);
+                } else if (inputStr.length === 8) {
+                    month = parseInt(inputStr.substring(0, 2), 10);
+                    day = parseInt(inputStr.substring(2, 4), 10);
+                    hour = parseInt(inputStr.substring(4, 6), 10);
+                    min = parseInt(inputStr.substring(6, 8), 10);
+                } else if (inputStr.length === 12) {
+                    year = parseInt(inputStr.substring(0, 4), 10);
+                    month = parseInt(inputStr.substring(4, 6), 10);
+                    day = parseInt(inputStr.substring(6, 8), 10);
+                    hour = parseInt(inputStr.substring(8, 10), 10);
+                    min = parseInt(inputStr.substring(10, 12), 10);
+                }
                 
                 const isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
                 dateObj = new Date(isoStr);
-                if (!isNaN(dateObj.getTime())) {
+                
+                if (!isNaN(dateObj.getTime()) && cleanTitle.length > 0 && hour >= 0 && hour <= 23 && min >= 0 && min <= 59 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
                     isShortcutValid = true;
                 } else {
                     cleanTitle = title;
