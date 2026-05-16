@@ -308,32 +308,38 @@ client.on('interactionCreate', async interaction => {
                 const todoId = parts[2];
 
                 if (action === 'plan') {
+                    const now = new Date();
+                    const initialValue = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
                     const modal = new ModalBuilder()
                         .setCustomId(`modal_exec_${todoId}`)
                         .setTitle('日時を設定して予定化');
                     const datetimeInput = new TextInputBuilder()
                         .setCustomId('datetimeInput')
-                        .setLabel('日時を12桁の数字で入力 (例: 202605101430)')
+                        .setLabel('4桁(HHmm) / 8桁(MMDD..) / 12桁で入力')
                         .setStyle(TextInputStyle.Short)
                         .setRequired(true)
-                        .setMinLength(12)
-                        .setMaxLength(12);
+                        .setMinLength(4)
+                        .setMaxLength(12)
+                        .setValue(initialValue);
                     modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
                     await interaction.showModal(modal);
                     return;
                 }
 
                 if (action === 'change' || action === 'resched') {
+                    const now = new Date();
+                    const initialValue = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
                     const modal = new ModalBuilder()
                         .setCustomId(`modal_resched_${todoId}`)
                         .setTitle('新しい日時を設定してリスケ');
                     const datetimeInput = new TextInputBuilder()
                         .setCustomId('datetimeInput')
-                        .setLabel('新しい日時を12桁の数字で入力')
+                        .setLabel('4桁(HHmm) / 8桁(MMDD..) / 12桁で入力')
                         .setStyle(TextInputStyle.Short)
                         .setRequired(true)
-                        .setMinLength(12)
-                        .setMaxLength(12);
+                        .setMinLength(4)
+                        .setMaxLength(12)
+                        .setValue(initialValue);
                     modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
                     await interaction.showModal(modal);
                     return;
@@ -370,17 +376,20 @@ client.on('interactionCreate', async interaction => {
 
             if (customId.startsWith('exec_')) {
                 const todoId = customId.split('_')[1];
+                const now = new Date();
+                const initialValue = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
                 const modal = new ModalBuilder()
                     .setCustomId(`modal_exec_${todoId}`)
                     .setTitle('日時を設定して予定化');
 
                 const datetimeInput = new TextInputBuilder()
                     .setCustomId('datetimeInput')
-                    .setLabel('日時を12桁の数字で入力 (例: 202605101430)')
+                    .setLabel('4桁(HHmm) / 8桁(MMDD..) / 12桁で入力')
                     .setStyle(TextInputStyle.Short)
                     .setRequired(true)
-                    .setMinLength(12)
-                    .setMaxLength(12);
+                    .setMinLength(4)
+                    .setMaxLength(12)
+                    .setValue(initialValue);
 
                 const firstActionRow = new ActionRowBuilder().addComponents(datetimeInput);
                 modal.addComponents(firstActionRow);
@@ -465,17 +474,20 @@ client.on('interactionCreate', async interaction => {
 
             if (customId.startsWith('resched_')) {
                 const todoId = customId.split('_')[1];
+                const now = new Date();
+                const initialValue = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
                 const modal = new ModalBuilder()
                     .setCustomId(`modal_resched_${todoId}`)
                     .setTitle('新しい日時を設定してリスケ');
 
                 const datetimeInput = new TextInputBuilder()
                     .setCustomId('datetimeInput')
-                    .setLabel('新しい日時を12桁の数字で入力')
+                    .setLabel('4桁(HHmm) / 8桁(MMDD..) / 12桁で入力')
                     .setStyle(TextInputStyle.Short)
                     .setRequired(true)
-                    .setMinLength(12)
-                    .setMaxLength(12);
+                    .setMinLength(4)
+                    .setMaxLength(12)
+                    .setValue(initialValue);
 
                 const firstActionRow = new ActionRowBuilder().addComponents(datetimeInput);
                 modal.addComponents(firstActionRow);
@@ -537,36 +549,86 @@ client.on('interactionCreate', async interaction => {
                 const todoId = interaction.customId.split('_')[2];
                 const inputStr = interaction.fields.getTextInputValue('datetimeInput');
                 
-                if (!/^\d{12}$/.test(inputStr)) {
-                    return interaction.reply({ content: '❌ フォーマットが間違っています。12桁の半角数字で入力してください。', ephemeral: true });
+                if (!/^(\d{4}|\d{8}|\d{12})$/.test(inputStr)) {
+                    return interaction.reply({ content: '❌ フォーマットが間違っています。4桁、8桁、または12桁の半角数字で入力してください。', ephemeral: true });
                 }
                 
-                const year = inputStr.substring(0, 4);
-                const month = inputStr.substring(4, 6);
-                const day = inputStr.substring(6, 8);
-                const hour = inputStr.substring(8, 10);
-                const min = inputStr.substring(10, 12);
+                const now = new Date();
+                let year = now.getFullYear();
+                let month = now.getMonth() + 1;
+                let day = now.getDate();
+                let hour = 0;
+                let min = 0;
+
+                if (inputStr.length === 4) {
+                    hour = parseInt(inputStr.substring(0, 2), 10);
+                    min = parseInt(inputStr.substring(2, 4), 10);
+                } else if (inputStr.length === 8) {
+                    month = parseInt(inputStr.substring(0, 2), 10);
+                    day = parseInt(inputStr.substring(2, 4), 10);
+                    hour = parseInt(inputStr.substring(4, 6), 10);
+                    min = parseInt(inputStr.substring(6, 8), 10);
+                } else if (inputStr.length === 12) {
+                    year = parseInt(inputStr.substring(0, 4), 10);
+                    month = parseInt(inputStr.substring(4, 6), 10);
+                    day = parseInt(inputStr.substring(6, 8), 10);
+                    hour = parseInt(inputStr.substring(8, 10), 10);
+                    min = parseInt(inputStr.substring(10, 12), 10);
+                }
                 
-                const dateObj = new Date(year, parseInt(month) - 1, day, hour, min);
+                const dateObj = new Date(year, month - 1, day, hour, min);
                 if (isNaN(dateObj.getTime())) {
                     return interaction.reply({ content: '❌ 無効な日時です。', ephemeral: true });
                 }
-                
+
+                await interaction.reply({ content: '⏳ Googleカレンダーに登録しています...', ephemeral: true });
+
+                const res = await pool.query("SELECT title, calendar_event_id, scheduled_at FROM todos WHERE id = $1", [todoId]);
+                if (res.rows.length === 0) {
+                    return interaction.editReply('❌ TODOが見つかりません。');
+                }
+                const { title, calendar_event_id, scheduled_at } = res.rows[0];
+
+                if (isResched) {
+                    if (!calendar_event_id) {
+                        return interaction.editReply('❌ 連携されたカレンダー情報が見つかりません。');
+                    }
+                    const success = await calendar.updateEvent(calendar_event_id, title, dateObj.toISOString());
+                    if (!success) {
+                        return interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
+                    }
+                    await pool.query(
+                        "UPDATE todos SET scheduled_at = $1 WHERE id = $2",
+                        [dateObj.toISOString(), todoId]
+                    );
+                    await pool.query(
+                        "INSERT INTO actions (todo_id, action_type, action_at, from_time, to_time) VALUES ($1, 'rescheduled', CURRENT_TIMESTAMP, $2, $3)",
+                        [todoId, scheduled_at, dateObj.toISOString()]
+                    );
+                } else {
+                    const eventId = await calendar.addEvent(title, dateObj.toISOString());
+                    if (!eventId) {
+                        return interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
+                    }
+                    await pool.query(
+                        "UPDATE todos SET status = 'scheduled', scheduled_at = $1, calendar_event_id = $2 WHERE id = $3",
+                        [dateObj.toISOString(), eventId, todoId]
+                    );
+                    await pool.query(
+                        "INSERT INTO actions (todo_id, action_type, action_at) VALUES ($1, 'scheduled', CURRENT_TIMESTAMP)",
+                        [todoId]
+                    );
+                }
+
                 const days = ['日', '月', '火', '水', '木', '金', '土'];
                 const dayStr = days[dateObj.getDay()];
-                
-                const confirmText = isResched 
-                    ? `📅 新しい日時を **${year}年${parseInt(month)}月${parseInt(day)}日（${dayStr}）${hour}:${min}** に変更してよいですか？`
-                    : `📅 **${year}年${parseInt(month)}月${parseInt(day)}日（${dayStr}）${hour}:${min}** でよいですか？`;
-                
-                const prefix = isResched ? 'resched' : 'exec';
-                
-                const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId(`confirm${prefix}_${todoId}_${inputStr}`).setLabel('はい').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId(`cancel${prefix}_${todoId}`).setLabel('いいえ').setStyle(ButtonStyle.Secondary)
-                );
-                
-                await interaction.reply({ content: confirmText, components: [row], ephemeral: true });
+                const timeMsg = `**${year}年${month}月${day}日（${dayStr}）${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}**`;
+
+                if (isResched) {
+                    await interaction.editReply(`✅ Googleカレンダーの予定を ${timeMsg} にリスケしました！`);
+                } else {
+                    await interaction.editReply(`✅ ${timeMsg} でGoogleカレンダーに予定を登録し、予定済み一覧へ移動しました！`);
+                }
                 return;
             }
         }
