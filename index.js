@@ -216,20 +216,24 @@ client.on('messageCreate', async (message) => {
         if (match && match[1]) {
             const title = match[1].trim();
             if (title.toLowerCase() === 'list') {
+                await message.delete().catch(() => {});
                 await showPendingList(message.channel);
                 return;
             }
             if (title.toLowerCase() === 'scheduled') {
+                await message.delete().catch(() => {});
                 await showScheduledList(message.channel);
                 return;
             }
             if (title === '予定' || title === '確認' || title === '一覧' || title === 'まとめ' || title === '予定出して') {
+                await message.delete().catch(() => {});
                 await showDashboard(message.channel);
                 return;
             }
             if (title.toLowerCase() === 'analyze' || title === '分析') {
+                await message.delete().catch(() => {});
                 const url = process.env.PUBLIC_URL || 'http://localhost:3000';
-                await message.reply(`📊 じぞーの分析ページはこちらです：\n${url}`);
+                await message.channel.send(`📊 じぞーの分析ページはこちらです：\n${url}`);
                 return;
             }
             const shortcutMatch = title.match(/^(.*?)(?:[\s　]+)?(\d{4}|\d{8}|\d{12})$/);
