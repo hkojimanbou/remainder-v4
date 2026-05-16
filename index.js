@@ -594,7 +594,8 @@ client.on('interactionCreate', async interaction => {
                     min = parseInt(inputStr.substring(10, 12), 10);
                 }
                 
-                const dateObj = new Date(year, month - 1, day, hour, min);
+                const isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
+                const dateObj = new Date(isoStr);
                 if (isNaN(dateObj.getTime())) {
                     return interaction.reply({ content: '❌ 無効な日時です。', ephemeral: true });
                 }
@@ -639,7 +640,8 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 const days = ['日', '月', '火', '水', '木', '金', '土'];
-                const dayStr = days[dateObj.getDay()];
+                const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+                const dayStr = days[dayOfWeek];
                 const timeMsg = `**${year}年${month}月${day}日（${dayStr}）${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}**`;
 
                 if (isResched) {
