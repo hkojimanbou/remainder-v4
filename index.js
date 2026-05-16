@@ -286,8 +286,9 @@ client.on('interactionCreate', async interaction => {
                     );
                 } else if (category === 'overdue' || category === 'done') {
                     options.push(
-                        new StringSelectMenuOptionBuilder().setLabel('✅ 完全に完了').setValue(`action_fulldone_${todoId}`),
-                        new StringSelectMenuOptionBuilder().setLabel('🔄 再リスケ').setValue(`action_resched_${todoId}`)
+                        new StringSelectMenuOptionBuilder().setLabel('✅ 完了').setValue(`action_fulldone_${todoId}`),
+                        new StringSelectMenuOptionBuilder().setLabel('🔄 再リスケ').setValue(`action_resched_${todoId}`),
+                        new StringSelectMenuOptionBuilder().setLabel('❌ 取止め').setValue(`action_cancel_${todoId}`)
                     );
                 }
 
@@ -356,6 +357,7 @@ client.on('interactionCreate', async interaction => {
                 if (action === 'hold') {
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'held')", [todoId]);
                     await interaction.update({ content: `⏸️ TODO #${todoId} を保留（後回し）にしました。`, components: [] });
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
                     return;
                 }
 
@@ -367,6 +369,7 @@ client.on('interactionCreate', async interaction => {
                     await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
                     await interaction.update({ content: `❌ TODO #${todoId} を取り止めました。`, components: [] });
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
                     return;
                 }
 
@@ -374,6 +377,7 @@ client.on('interactionCreate', async interaction => {
                     await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
                     await interaction.update({ content: `✅ TODO #${todoId} を完了にしました！お疲れ様です！`, components: [] });
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
                     return;
                 }
             }
@@ -649,6 +653,7 @@ client.on('interactionCreate', async interaction => {
                 } else {
                     await interaction.editReply(`✅ ${timeMsg} でGoogleカレンダーに予定を登録し、予定済み一覧へ移動しました！`);
                 }
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
                 return;
             }
         }
