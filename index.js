@@ -24,7 +24,7 @@ app.post('/api/macro-todo', async (req, res) => {
     console.log('【受信成功】スマホからタスクが届きました:', text);
     
     try {
-        const channelId = process.env.DISCORD_CHANNEL_ID || '1501078130373300244'; 
+        const channelId = process.env.DISCORD_CHANNEL_ID || '1507412423114625024'; 
         const channel = await client.channels.fetch(channelId);
         
         if (channel) {
