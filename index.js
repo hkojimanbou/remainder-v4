@@ -252,6 +252,7 @@ client.on('messageCreate', async (message) => {
             let isShortcutValid = false;
             let dateObj = null;
             let cleanTitle = title;
+            let isoStr = '';
             
             if (shortcutMatch) {
                 cleanTitle = shortcutMatch[1].trim();
@@ -283,7 +284,7 @@ client.on('messageCreate', async (message) => {
                     min = parseInt(inputStr.substring(10, 12), 10);
                 }
                 
-                const isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
+                isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
                 dateObj = new Date(isoStr);
                 
                 if (!isNaN(dateObj.getTime()) && cleanTitle.length > 0 && hour >= 0 && hour <= 23 && min >= 0 && min <= 59 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
@@ -295,7 +296,7 @@ client.on('messageCreate', async (message) => {
 
             if (isShortcutValid) {
                 try {
-                    const eventId = await calendar.addEvent(cleanTitle, dateObj.toISOString());
+                    const eventId = await calendar.addEvent(cleanTitle, isoStr);
                     if (!eventId) {
                         await message.react('❌');
                         return;
@@ -558,7 +559,8 @@ client.on('interactionCreate', async interaction => {
                 const day = inputStr.substring(6, 8);
                 const hour = inputStr.substring(8, 10);
                 const min = inputStr.substring(10, 12);
-                const dateObj = new Date(year, parseInt(month) - 1, day, hour, min);
+                const isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
+                const dateObj = new Date(isoStr);
 
                 const res = await pool.query("SELECT title FROM todos WHERE id = $1", [todoId]);
                 if (res.rows.length === 0) {
@@ -568,7 +570,7 @@ client.on('interactionCreate', async interaction => {
                 }
                 const title = res.rows[0].title;
 
-                const eventId = await calendar.addEvent(title, dateObj.toISOString());
+                const eventId = await calendar.addEvent(title, isoStr);
                 if (!eventId) {
                     await interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
                     setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
@@ -671,7 +673,8 @@ client.on('interactionCreate', async interaction => {
                 const day = inputStr.substring(6, 8);
                 const hour = inputStr.substring(8, 10);
                 const min = inputStr.substring(10, 12);
-                const newDateObj = new Date(year, parseInt(month) - 1, day, hour, min);
+                const isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
+                const newDateObj = new Date(isoStr);
 
                 const res = await pool.query("SELECT title, calendar_event_id, scheduled_at FROM todos WHERE id = $1", [todoId]);
                 if (res.rows.length === 0) {
@@ -687,7 +690,7 @@ client.on('interactionCreate', async interaction => {
                     return;
                 }
 
-                const success = await calendar.updateEvent(calendar_event_id, title, newDateObj.toISOString());
+                const success = await calendar.updateEvent(calendar_event_id, title, isoStr);
                 if (!success) {
                     await interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
                     setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
