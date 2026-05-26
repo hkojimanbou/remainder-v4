@@ -42,8 +42,9 @@ async function addEvent(title, startTimeIso) {
         const res = await calendar.events.insert({ calendarId: 'primary', resource: event });
         return res.data.id;
     } catch (err) {
-        console.error('カレンダー追加エラー (APIリクエスト失敗):', err.response?.data || err.message || err);
-        return null;
+        const errMsg = err.response?.data?.error?.message || err.message || String(err);
+        console.error('カレンダー追加エラー (APIリクエスト失敗):', errMsg);
+        throw new Error(`Calendar API Error: ${errMsg}`);
     }
 }
 
@@ -75,8 +76,9 @@ async function updateEvent(eventId, title, newStartTimeIso) {
         await calendar.events.update({ calendarId: 'primary', eventId: eventId, resource: event });
         return true;
     } catch (err) {
-        console.error('カレンダー更新エラー (APIリクエスト失敗):', err.response?.data || err.message || err);
-        return false;
+        const errMsg = err.response?.data?.error?.message || err.message || String(err);
+        console.error('カレンダー更新エラー (APIリクエスト失敗):', errMsg);
+        throw new Error(`Calendar API Error: ${errMsg}`);
     }
 }
 

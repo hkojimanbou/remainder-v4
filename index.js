@@ -834,9 +834,13 @@ if (!success) {
         }
     } catch (err) {
         console.error("Interaction Error:", err);
+        const errMsg = err.message || String(err);
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: "エラーが発生しました。", ephemeral: true });
-            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            await interaction.reply({ content: `❌ エラーが発生しました。\n詳細: ${errMsg}`, ephemeral: true });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 10000);
+        } else {
+            await interaction.editReply({ content: `❌ エラーが発生しました。\n詳細: ${errMsg}`, components: [] });
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 10000);
         }
     }
 });
