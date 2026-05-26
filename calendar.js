@@ -24,22 +24,16 @@ async function addEvent(title, startTimeIso) {
     const startDate = new Date(startTimeIso);
     const endDate = new Date(startDate.getTime() + 15 * 60000); // 15分間
 
-    // タイムゾーンのズレを確実に防ぐため、JSTのISO文字列を生成
-    const formatJST = (d) => {
-        const jst = new Date(d.getTime() + 9 * 3600000);
-        return jst.toISOString().replace('.000Z', '+09:00');
-    };
-
     const event = {
         summary: title,
         description: 'じぞー (Remainder v4.0) からのTODO予定化',
-        start: { dateTime: formatJST(startDate), timeZone: 'Asia/Tokyo' },
-        end: { dateTime: formatJST(endDate), timeZone: 'Asia/Tokyo' },
+        start: { dateTime: startDate.toISOString(), timeZone: 'Asia/Tokyo' },
+        end: { dateTime: endDate.toISOString(), timeZone: 'Asia/Tokyo' },
         reminders: { useDefault: true },
     };
 
     try {
-        const res = await calendar.events.insert({ calendarId: 'primary', resource: event });
+        const res = await calendar.events.insert({ calendarId: 'primary', requestBody: event });
         return res.data.id;
     } catch (err) {
         const errMsg = err.response?.data?.error?.message || err.message || String(err);
@@ -59,21 +53,16 @@ async function updateEvent(eventId, title, newStartTimeIso) {
     const startDate = new Date(newStartTimeIso);
     const endDate = new Date(startDate.getTime() + 15 * 60000);
 
-    const formatJST = (d) => {
-        const jst = new Date(d.getTime() + 9 * 3600000);
-        return jst.toISOString().replace('.000Z', '+09:00');
-    };
-
     const event = {
         summary: title,
         description: 'じぞー (Remainder v4.0) からのTODO予定化',
-        start: { dateTime: formatJST(startDate), timeZone: 'Asia/Tokyo' },
-        end: { dateTime: formatJST(endDate), timeZone: 'Asia/Tokyo' },
+        start: { dateTime: startDate.toISOString(), timeZone: 'Asia/Tokyo' },
+        end: { dateTime: endDate.toISOString(), timeZone: 'Asia/Tokyo' },
         reminders: { useDefault: true },
     };
 
     try {
-        await calendar.events.update({ calendarId: 'primary', eventId: eventId, resource: event });
+        await calendar.events.update({ calendarId: 'primary', eventId: eventId, requestBody: event });
         return true;
     } catch (err) {
         const errMsg = err.response?.data?.error?.message || err.message || String(err);
