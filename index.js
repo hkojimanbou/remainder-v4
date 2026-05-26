@@ -782,8 +782,9 @@ client.on('interactionCreate', async interaction => {
                         setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
                         return;
                     }
-                    const success = await calendar.updateEvent(calendar_event_id, title, dateObj.toISOString());
-                    if (!success) {
+                    //  修正後
+const success = await calendar.updateEvent(calendar_event_id, title, isoStr);
+if (!success) {
                         await interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
                         setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
                         return;
@@ -797,7 +798,7 @@ client.on('interactionCreate', async interaction => {
                         [todoId, scheduled_at, dateObj.toISOString()]
                     );
                 } else {
-                    const eventId = await calendar.addEvent(title, dateObj.toISOString());
+                    const eventId = await calendar.addEvent(title, isoStr);
                     if (!eventId) {
                         await interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
                         setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
