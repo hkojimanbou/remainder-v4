@@ -82,10 +82,49 @@ app.get('/api/stats', async (req, res) => {
     }
 });
 
+const { EventEmitter } = require('events');
+const macroEvent = new EventEmitter();
+
+app.post('/api/macro-todo', async (req, res) => {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey || apiKey !== process.env.API_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { text } = req.body;
+    if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: 'Bad Request' });
+    }
+
+    const cleanTitle = text.trim();
+    if (cleanTitle.length === 0) {
+        return res.status(400).json({ error: 'Text is empty' });
+    }
+
+    try {
+        const result = await pool.query(
+            "INSERT INTO todos (title, status) VALUES ($1, 'pending') RETURNING *",
+            [cleanTitle]
+        );
+        const newTodo = result.rows[0];
+
+        await pool.query(
+            "INSERT INTO actions (todo_id, action_type) VALUES ($1, 'created')",
+            [newTodo.id]
+        );
+
+        macroEvent.emit('newTodo', newTodo);
+        res.status(201).json({ success: true, todo: newTodo });
+    } catch (err) {
+        console.error("Macro API DB Error:", err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 function startServer(port = 3000) {
     app.listen(port, "0.0.0.0", () => {
         console.log(`Web server listening on port ${port}`);
     });
 }
 
-module.exports = { startServer };
+module.exports = { startServer, macroEvent };
