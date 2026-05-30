@@ -252,6 +252,18 @@ client.on('messageCreate', async (message) => {
                 await message.channel.send(`📊 じぞーの分析ページはこちらです：\n${url}`);
                 return;
             }
+            if (title === '分析クリア') {
+                await message.delete().catch(() => {});
+                try {
+                    await pool.query("DELETE FROM actions");
+                    await pool.query("DELETE FROM todos WHERE status IN ('done', 'cancelled')");
+                    const msg = await message.channel.send("🧹 分析データ（過去の完了済・取消タスクとアクション履歴）を現時点でリセットしました！\n明日からの新しいデータが分析対象になります。");
+                    setTimeout(() => msg.delete().catch(() => {}), 10000);
+                } catch (err) {
+                    await message.channel.send("❌ リセット中にエラーが発生しました。");
+                }
+                return;
+            }
             const shortcutMatch = title.match(/^(.*?)(?:[\s　]+)?(\d{4}|\d{8}|\d{12})$/);
             let isShortcutValid = false;
             let dateObj = null;
