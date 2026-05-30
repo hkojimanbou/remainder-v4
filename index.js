@@ -38,7 +38,7 @@ async function showPendingList(channel) {
                 new ButtonBuilder().setCustomId(`cancel_${t.id}`).setLabel('❌ 取止め').setStyle(ButtonStyle.Danger)
             );
             
-            const timeStr = new Date(t.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const timeStr = new Date(t.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo',  month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             
             messages.push({
                 content: `**#${t.id}** ${t.title} (登録: ${timeStr})`,
@@ -80,7 +80,7 @@ async function showScheduledList(channel) {
                 new ButtonBuilder().setCustomId(`cancelsched_${t.id}`).setLabel('❌ 取止め').setStyle(ButtonStyle.Danger)
             );
             
-            const timeStr = new Date(t.scheduled_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const timeStr = new Date(t.scheduled_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo',  month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             
             messages.push({
                 content: `**#${t.id}** ${t.title} (予定: ${timeStr})`,
@@ -141,11 +141,11 @@ async function showDashboard(channel, messageToEdit = null) {
         const formatTodo = (t, type) => {
             let timeStr = "";
             if (type === 'pending') {
-                timeStr = "登録: " + new Date(t.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                timeStr = "登録: " + new Date(t.created_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo',  month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             } else if (type === 'scheduled' || type === 'overdue') {
-                timeStr = new Date(t.scheduled_at).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                timeStr = new Date(t.scheduled_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo',  hour: '2-digit', minute: '2-digit' });
             } else if (type === 'done') {
-                timeStr = t.scheduled_at ? new Date(t.scheduled_at).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : "未定";
+                timeStr = t.scheduled_at ? new Date(t.scheduled_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo',  hour: '2-digit', minute: '2-digit' }) : "未定";
             }
             return `#${t.id} ${t.title} (${timeStr})`;
         };
