@@ -334,6 +334,7 @@ client.on('messageCreate', async (message) => {
                     );
 
                     await message.react('✅');
+                    setTimeout(() => message.delete().catch(() => {}), 60000);
                 } catch (err) {
                     console.error(err);
                     await message.react('❌');
@@ -355,6 +356,7 @@ client.on('messageCreate', async (message) => {
 
                 try {
                     await message.react('✅');
+                    setTimeout(() => message.delete().catch(() => {}), 60000);
                 } catch (e) {
                     // リアクション失敗時は無応答でよい
                 }
