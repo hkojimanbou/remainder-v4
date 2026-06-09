@@ -264,7 +264,7 @@ client.on('messageCreate', async (message) => {
                 }
                 return;
             }
-            const shortcutMatch = title.match(/^(.*?)(?:[\s　]+)?(\d{4}|\d{8}|\d{12})$/);
+            const shortcutMatch = title.match(/^(.*?)(?:[\s　]+)?(\d{4}|\d{6}|\d{8}|\d{12})$/);
             let isShortcutValid = false;
             let dateObj = null;
             let cleanTitle = title;
@@ -287,6 +287,10 @@ client.on('messageCreate', async (message) => {
                 if (inputStr.length === 4) {
                     hour = parseInt(inputStr.substring(0, 2), 10);
                     min = parseInt(inputStr.substring(2, 4), 10);
+                } else if (inputStr.length === 6) {
+                    day = parseInt(inputStr.substring(0, 2), 10);
+                    hour = parseInt(inputStr.substring(2, 4), 10);
+                    min = parseInt(inputStr.substring(4, 6), 10);
                 } else if (inputStr.length === 8) {
                     month = parseInt(inputStr.substring(0, 2), 10);
                     day = parseInt(inputStr.substring(2, 4), 10);
