@@ -243,6 +243,34 @@ client.on('messageCreate', async (message) => {
         const match = text.match(/^[!！][\s　]*(.+)$/);
         if (match && match[1]) {
             const title = match[1].trim();
+
+            if (title === 'debug_auth') {
+                try {
+                    const token = process.env.GOOGLE_TOKEN_JSON;
+                    if (!token) {
+                        await message.reply("GOOGLE_TOKEN_JSON is empty.");
+                        return;
+                    }
+                    let parsed;
+                    try {
+                        parsed = JSON.parse(token);
+                    } catch (e) {
+                        await message.reply("JSON Parse Error: " + e.message + "\nToken snippet: " + token.substring(0, 30));
+                        return;
+                    }
+                    const { google } = require('googleapis');
+                    try {
+                        const auth = google.auth.fromJSON(parsed);
+                        await message.reply("Auth parsed successfully! Type: " + parsed.type);
+                    } catch (e) {
+                        await message.reply("Auth fromJSON Error: " + e.message);
+                    }
+                } catch (e) {
+                    await message.reply("Unknown Error: " + e.message);
+                }
+                return;
+            }
+
             if (title.toLowerCase() === 'list') {
                 await message.delete().catch(() => {});
                 await showPendingList(message.channel);
