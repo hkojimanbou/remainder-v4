@@ -140,19 +140,7 @@ async function showDashboard(channel, messageToEdit = null) {
             }
         }
 
-        const doneRes = await pool.query(`
-            SELECT t.* FROM todos t 
-            WHERE t.status = 'done' 
-            AND EXISTS (
-                SELECT 1 FROM actions a 
-                WHERE a.todo_id = t.id 
-                AND a.action_type = 'done' 
-                AND a.action_at >= $1 AND a.action_at <= $2
-            )
-        `, [todayStart.toISOString(), todayEnd.toISOString()]);
-        const doneTodos = doneRes.rows;
-        
-        const risukeTodos = [...overdueTodos, ...doneTodos];
+        const risukeTodos = [...overdueTodos];
 
         const formatTodo = (t, type) => {
             let timeStr = "";
