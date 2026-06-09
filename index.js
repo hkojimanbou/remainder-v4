@@ -248,25 +248,30 @@ client.on('messageCreate', async (message) => {
                 try {
                     const token = process.env.GOOGLE_TOKEN_JSON;
                     if (!token) {
-                        await message.reply("GOOGLE_TOKEN_JSON is empty.");
+                        const reply = await message.reply("GOOGLE_TOKEN_JSON is empty.");
+                        setTimeout(() => { reply.delete().catch(() => {}); message.delete().catch(() => {}); }, 60000);
                         return;
                     }
                     let parsed;
                     try {
                         parsed = JSON.parse(token);
                     } catch (e) {
-                        await message.reply("JSON Parse Error: " + e.message + "\nToken snippet: " + token.substring(0, 30));
+                        const reply = await message.reply("JSON Parse Error: " + e.message + "\nToken snippet: " + token.substring(0, 30));
+                        setTimeout(() => { reply.delete().catch(() => {}); message.delete().catch(() => {}); }, 60000);
                         return;
                     }
                     const { google } = require('googleapis');
                     try {
                         const auth = google.auth.fromJSON(parsed);
-                        await message.reply("Auth parsed successfully! Type: " + parsed.type);
+                        const reply = await message.reply("Auth parsed successfully! Type: " + parsed.type);
+                        setTimeout(() => { reply.delete().catch(() => {}); message.delete().catch(() => {}); }, 60000);
                     } catch (e) {
-                        await message.reply("Auth fromJSON Error: " + e.message);
+                        const reply = await message.reply("Auth fromJSON Error: " + e.message);
+                        setTimeout(() => { reply.delete().catch(() => {}); message.delete().catch(() => {}); }, 60000);
                     }
                 } catch (e) {
-                    await message.reply("Unknown Error: " + e.message);
+                    const reply = await message.reply("Unknown Error: " + e.message);
+                    setTimeout(() => { reply.delete().catch(() => {}); message.delete().catch(() => {}); }, 60000);
                 }
                 return;
             }
@@ -358,7 +363,11 @@ client.on('messageCreate', async (message) => {
                 try {
                     const eventId = await calendar.addEvent(cleanTitle, isoStr);
                     if (!eventId) {
-                        await message.reply('❌ カレンダーイベントの作成に失敗しました (認証エラー等)');
+                        const reply = await message.reply('❌ カレンダーイベントの作成に失敗しました (認証エラー等)');
+                        setTimeout(() => {
+                            reply.delete().catch(() => {});
+                            message.delete().catch(() => {});
+                        }, 60000);
                         return;
                     }
                     
@@ -381,7 +390,11 @@ client.on('messageCreate', async (message) => {
                     setTimeout(() => message.delete().catch(() => {}), 60000);
                 } catch (err) {
                     console.error(err);
-                    await message.reply(`❌ エラーが発生しました: ${err.message}`);
+                    const reply = await message.reply(`❌ エラーが発生しました: ${err.message}`);
+                    setTimeout(() => {
+                        reply.delete().catch(() => {});
+                        message.delete().catch(() => {});
+                    }, 60000);
                 }
                 return;
             }
