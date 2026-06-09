@@ -4,7 +4,14 @@ async function getAuthClient() {
     try {
         if (process.env.GOOGLE_TOKEN_JSON) {
             const credentials = JSON.parse(process.env.GOOGLE_TOKEN_JSON);
-            return google.auth.fromJSON(credentials);
+            const oauth2Client = new google.auth.OAuth2(
+                credentials.client_id,
+                credentials.client_secret
+            );
+            oauth2Client.setCredentials({
+                refresh_token: credentials.refresh_token
+            });
+            return oauth2Client;
         }
         return null;
     } catch (err) {
