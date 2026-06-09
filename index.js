@@ -330,7 +330,7 @@ client.on('messageCreate', async (message) => {
                 try {
                     const eventId = await calendar.addEvent(cleanTitle, isoStr);
                     if (!eventId) {
-                        await message.react('❌');
+                        await message.reply('❌ カレンダーイベントの作成に失敗しました (認証エラー等)');
                         return;
                     }
                     
@@ -353,7 +353,7 @@ client.on('messageCreate', async (message) => {
                     setTimeout(() => message.delete().catch(() => {}), 60000);
                 } catch (err) {
                     console.error(err);
-                    await message.react('❌');
+                    await message.reply(`❌ エラーが発生しました: ${err.message}`);
                 }
                 return;
             }
