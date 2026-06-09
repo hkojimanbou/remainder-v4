@@ -194,12 +194,20 @@ async function showDashboard(channel, messageToEdit = null) {
                 .addOptions(finalOptions);
             const row2 = new ActionRowBuilder().addComponents(bulkCancelMenu);
 
+            const bulkCompleteMenu = new StringSelectMenuBuilder()
+                .setCustomId('dashboard_bulk_complete')
+                .setPlaceholder('✅ 一括完了にするTODOを複数選択')
+                .setMinValues(1)
+                .setMaxValues(finalOptions.length)
+                .addOptions(finalOptions);
+            const row3 = new ActionRowBuilder().addComponents(bulkCompleteMenu);
+
             if (messageToEdit) {
-                lastDashboardMessage = await messageToEdit.edit({ content: '', embeds: [embed], components: [row1, row2, closeBtnRow] }).catch(async () => {
-                    lastDashboardMessage = await channel.send({ embeds: [embed], components: [row1, row2, closeBtnRow] });
+                lastDashboardMessage = await messageToEdit.edit({ content: '', embeds: [embed], components: [row1, row3, row2, closeBtnRow] }).catch(async () => {
+                    lastDashboardMessage = await channel.send({ embeds: [embed], components: [row1, row3, row2, closeBtnRow] });
                 });
             } else {
-                lastDashboardMessage = await channel.send({ embeds: [embed], components: [row1, row2, closeBtnRow] });
+                lastDashboardMessage = await channel.send({ embeds: [embed], components: [row1, row3, row2, closeBtnRow] });
             }
         } else {
             if (messageToEdit) {
@@ -393,6 +401,21 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 await interaction.editReply(`🗑️ ${todoIds.length}件のTODOを一括で取り止めました！`);
+                await showDashboard(interaction.channel, interaction.message);
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
+                return;
+            }
+
+            if (interaction.customId === 'dashboard_bulk_complete') {
+                const todoIds = interaction.values;
+                await interaction.deferReply({ ephemeral: true });
+
+                for (const todoId of todoIds) {
+                    await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
+                    await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
+                }
+
+                await interaction.editReply(`✅ ${todoIds.length}件のTODOを一括で完了にしました！`);
                 await showDashboard(interaction.channel, interaction.message);
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
