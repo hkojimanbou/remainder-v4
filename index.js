@@ -2,10 +2,26 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { pool } = require('./db');
 const calendar = require('./calendar');
+const tasks = require('./tasks');
 const { startServer, macroEvent } = require('./web');
 
 let lastDashboardChannel = null;
 let lastDashboardMessage = null;
+
+async function syncTaskToList(todoId, listName, isCompleted) {
+    try {
+        const res = await pool.query("SELECT title FROM todos WHERE id = $1", [todoId]);
+        if (res.rows.length > 0) {
+            const title = res.rows[0].title;
+            const listId = await tasks.ensureTaskList(listName);
+            if (listId) {
+                await tasks.addTaskToList(listId, title, isCompleted);
+            }
+        }
+    } catch (err) {
+        console.error("Task Sync Error:", err);
+    }
+}
 
 const client = new Client({
     intents: [
@@ -398,6 +414,7 @@ client.on('interactionCreate', async interaction => {
                     }
                     await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
+                    await syncTaskToList(todoId, '取止め', false);
                 }
 
                 await interaction.editReply(`🗑️ ${todoIds.length}件のTODOを一括で取り止めました！`);
@@ -413,6 +430,7 @@ client.on('interactionCreate', async interaction => {
                 for (const todoId of todoIds) {
                     await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
+                    await syncTaskToList(todoId, '思い付き完了リスト', true);
                 }
 
                 await interaction.editReply(`✅ ${todoIds.length}件のTODOを一括で完了にしました！`);
@@ -541,6 +559,7 @@ client.on('interactionCreate', async interaction => {
                     }
                     await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
+                    await syncTaskToList(todoId, '取止め', false);
                     await interaction.reply({ content: `❌ TODO #${todoId} を取り止めました。`, ephemeral: true });
                     await showDashboard(interaction.channel, interaction.message);
                     setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
@@ -550,6 +569,7 @@ client.on('interactionCreate', async interaction => {
                 if (action === 'done' || action === 'fulldone') {
                     await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
+                    await syncTaskToList(todoId, '思い付き完了リスト', true);
                     await interaction.reply({ content: `✅ TODO #${todoId} を完了にしました！お疲れ様です！`, ephemeral: true });
                     await showDashboard(interaction.channel, interaction.message);
                     setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
@@ -650,6 +670,7 @@ client.on('interactionCreate', async interaction => {
                     "INSERT INTO actions (todo_id, action_type, action_at) VALUES ($1, 'cancelled', CURRENT_TIMESTAMP)",
                     [todoId]
                 );
+                await syncTaskToList(todoId, '取止め', false);
                 await interaction.reply({ content: `🗑️ TODO #${todoId} を取り止めました。`, ephemeral: true });
                 await interaction.message.delete().catch(() => {});
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
@@ -661,6 +682,7 @@ client.on('interactionCreate', async interaction => {
                 const todoId = customId.split('_')[1];
                 await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
                 await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
+                await syncTaskToList(todoId, '思い付き完了リスト', true);
                 await interaction.reply({ content: `✅ TODO #${todoId} を「完了」にしました！お疲れ様です！`, ephemeral: true });
                 await interaction.message.delete().catch(() => {});
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
@@ -675,6 +697,7 @@ client.on('interactionCreate', async interaction => {
                 }
                 await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
                 await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
+                await syncTaskToList(todoId, '取止め', false);
                 await interaction.reply({ content: `🗑️ TODO #${todoId} を取り止め、カレンダーからも削除しました。`, ephemeral: true });
                 await interaction.message.delete().catch(() => {});
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
