@@ -114,7 +114,7 @@ async function showScheduledList(channel) {
     }
 }
 
-async function showDashboard(channel, messageToEdit = null) {
+async function showDashboard(channel, messageToEdit = null, allowNew = true) {
     lastDashboardChannel = channel;
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
@@ -208,13 +208,13 @@ async function showDashboard(channel, messageToEdit = null) {
 
             if (messageToEdit) {
                 await messageToEdit.edit({ content: '', embeds: [embed], components: [row1, row3, row2, closeBtnRow] }).catch(() => {});
-            } else {
+            } else if (allowNew) {
                 lastDashboardMessage = await channel.send({ embeds: [embed], components: [row1, row3, row2, closeBtnRow] });
             }
         } else {
             if (messageToEdit) {
                 await messageToEdit.edit({ content: '', embeds: [embed], components: [closeBtnRow] }).catch(() => {});
-            } else {
+            } else if (allowNew) {
                 lastDashboardMessage = await channel.send({ embeds: [embed], components: [closeBtnRow] });
             }
         }
@@ -443,7 +443,7 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 await interaction.editReply(`🗑️ ${todoIds.length}件のTODOを一括で取り止めました！`);
-                await showDashboard(interaction.channel, lastDashboardMessage);
+                await showDashboard(interaction.channel, lastDashboardMessage, false);
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
@@ -459,7 +459,7 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 await interaction.editReply(`✅ ${todoIds.length}件のTODOを一括で完了にしました！`);
-                await showDashboard(interaction.channel, lastDashboardMessage);
+                await showDashboard(interaction.channel, lastDashboardMessage, false);
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
@@ -572,7 +572,7 @@ client.on('interactionCreate', async interaction => {
                 if (action === 'hold') {
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'held')", [todoId]);
                     await interaction.reply({ content: `⏸️ TODO #${todoId} を保留（後回し）にしました。`, ephemeral: true });
-                    await showDashboard(interaction.channel, lastDashboardMessage);
+                    await showDashboard(interaction.channel, lastDashboardMessage, false);
                     setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                     return;
                 }
@@ -586,7 +586,7 @@ client.on('interactionCreate', async interaction => {
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
                     await syncTaskToList(todoId, '取止め', false);
                     await interaction.reply({ content: `❌ TODO #${todoId} を取り止めました。`, ephemeral: true });
-                    await showDashboard(interaction.channel, lastDashboardMessage);
+                    await showDashboard(interaction.channel, lastDashboardMessage, false);
                     setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                     return;
                 }
@@ -596,7 +596,7 @@ client.on('interactionCreate', async interaction => {
                     await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
                     await syncTaskToList(todoId, '思い付き完了リスト', true);
                     await interaction.reply({ content: `✅ TODO #${todoId} を完了にしました！お疲れ様です！`, ephemeral: true });
-                    await showDashboard(interaction.channel, lastDashboardMessage);
+                    await showDashboard(interaction.channel, lastDashboardMessage, false);
                     setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                     return;
                 }
@@ -677,7 +677,7 @@ client.on('interactionCreate', async interaction => {
                 );
 
                 await interaction.editReply(`✅ Googleカレンダーに予定を登録し、予定済み一覧へ移動しました！`);
-                await showDashboard(interaction.channel, lastDashboardMessage);
+                await showDashboard(interaction.channel, lastDashboardMessage, false);
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
@@ -800,7 +800,7 @@ client.on('interactionCreate', async interaction => {
                 );
 
                 await interaction.editReply(`✅ Googleカレンダーの予定を新しい日時にリスケしました！`);
-                await showDashboard(interaction.channel, lastDashboardMessage);
+                await showDashboard(interaction.channel, lastDashboardMessage, false);
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
@@ -920,7 +920,7 @@ if (!success) {
                 } else {
                     await interaction.editReply(`✅ ${timeMsg} でGoogleカレンダーに予定を登録し、予定済み一覧へ移動しました！`);
                 }
-                await showDashboard(interaction.channel, lastDashboardMessage);
+                await showDashboard(interaction.channel, lastDashboardMessage, false);
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
                 return;
             }
@@ -943,6 +943,6 @@ startServer(process.env.PORT || 3000);
 
 macroEvent.on('newTodo', async (todo) => {
     if (lastDashboardChannel) {
-        await showDashboard(lastDashboardChannel, lastDashboardMessage);
+        await showDashboard(lastDashboardChannel, lastDashboardMessage, false);
     }
 });
