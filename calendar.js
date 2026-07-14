@@ -20,7 +20,7 @@ async function getAuthClient() {
     }
 }
 
-async function addEvent(title, startTimeIso) {
+async function addEvent(title, startTimeIso, reminderOverrides = null) {
     const auth = await getAuthClient();
     if (!auth) {
         console.error('カレンダー追加エラー: 認証クライアントの取得に失敗しました (GOOGLE_TOKEN_JSONが未設定、または不正な形式です)。');
@@ -31,12 +31,20 @@ async function addEvent(title, startTimeIso) {
     const startDate = new Date(startTimeIso);
     const endDate = new Date(startDate.getTime() + 15 * 60000); // 15分間
 
+    let remindersObj = { useDefault: true };
+    if (reminderOverrides && reminderOverrides.length > 0) {
+        remindersObj = {
+            useDefault: false,
+            overrides: reminderOverrides
+        };
+    }
+
     const event = {
         summary: title,
         description: 'じぞー (Remainder v4.0) からのTODO予定化',
         start: { dateTime: startDate.toISOString(), timeZone: 'Asia/Tokyo' },
         end: { dateTime: endDate.toISOString(), timeZone: 'Asia/Tokyo' },
-        reminders: { useDefault: true },
+        reminders: remindersObj,
     };
 
     try {
@@ -49,7 +57,7 @@ async function addEvent(title, startTimeIso) {
     }
 }
 
-async function updateEvent(eventId, title, newStartTimeIso) {
+async function updateEvent(eventId, title, newStartTimeIso, reminderOverrides = null) {
     const auth = await getAuthClient();
     if (!auth) {
         console.error('カレンダー更新エラー: 認証クライアントの取得に失敗しました。');
@@ -60,12 +68,20 @@ async function updateEvent(eventId, title, newStartTimeIso) {
     const startDate = new Date(newStartTimeIso);
     const endDate = new Date(startDate.getTime() + 15 * 60000);
 
+    let remindersObj = { useDefault: true };
+    if (reminderOverrides && reminderOverrides.length > 0) {
+        remindersObj = {
+            useDefault: false,
+            overrides: reminderOverrides
+        };
+    }
+
     const event = {
         summary: title,
         description: 'じぞー (Remainder v4.0) からのTODO予定化',
         start: { dateTime: startDate.toISOString(), timeZone: 'Asia/Tokyo' },
         end: { dateTime: endDate.toISOString(), timeZone: 'Asia/Tokyo' },
-        reminders: { useDefault: true },
+        reminders: remindersObj,
     };
 
     try {

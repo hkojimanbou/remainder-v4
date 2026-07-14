@@ -423,6 +423,67 @@ client.on('messageCreate', async (message) => {
 });
 
 client.on('interactionCreate', async interaction => {
+    async function executeSchedule(interaction, todoId, isResched, isoStr, reminderOverrides = []) {
+        const dateObj = new Date(isoStr);
+        const res = await pool.query("SELECT title, calendar_event_id, scheduled_at FROM todos WHERE id = $1", [todoId]);
+        if (res.rows.length === 0) {
+            await interaction.editReply('❌ TODOが見つかりません。');
+            setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+            return;
+        }
+        const { title, calendar_event_id, scheduled_at } = res.rows[0];
+
+        if (isResched) {
+            if (!calendar_event_id) {
+                await interaction.editReply('❌ 連携されたカレンダー情報が見つかりません。');
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                return;
+            }
+            const success = await calendar.updateEvent(calendar_event_id, title, isoStr, reminderOverrides);
+            if (!success) {
+                await interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                return;
+            }
+            await pool.query(
+                "UPDATE todos SET scheduled_at = $1 WHERE id = $2",
+                [dateObj.toISOString(), todoId]
+            );
+            await pool.query(
+                "INSERT INTO actions (todo_id, action_type, action_at, from_time, to_time) VALUES ($1, 'rescheduled', CURRENT_TIMESTAMP, $2, $3)",
+                [todoId, scheduled_at, dateObj.toISOString()]
+            );
+        } else {
+            const eventId = await calendar.addEvent(title, isoStr, reminderOverrides);
+            if (!eventId) {
+                await interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                return;
+            }
+            await pool.query(
+                "UPDATE todos SET status = 'scheduled', scheduled_at = $1, calendar_event_id = $2 WHERE id = $3",
+                [dateObj.toISOString(), eventId, todoId]
+            );
+            await pool.query(
+                "INSERT INTO actions (todo_id, action_type, action_at) VALUES ($1, 'scheduled', CURRENT_TIMESTAMP)",
+                [todoId]
+            );
+        }
+
+        const days = ['日', '月', '火', '水', '木', '金', '土'];
+        const dayOfWeek = new Date(isoStr).getDay();
+        const dayStr = days[dayOfWeek];
+        const timeMsg = `**${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日（${dayStr}）${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}**`;
+
+        if (isResched) {
+            await interaction.editReply(`✅ Googleカレンダーの予定を ${timeMsg} にリスケしました！`);
+        } else {
+            await interaction.editReply(`✅ ${timeMsg} でGoogleカレンダーに予定を登録し、予定済み一覧へ移動しました！`);
+        }
+        await showDashboard(interaction.channel, lastDashboardMessage, false);
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
+    }
+
     try {
         if (interaction.isStringSelectMenu()) {
             if (interaction.customId === 'dashboard_bulk_cancel') {
@@ -462,6 +523,39 @@ client.on('interactionCreate', async interaction => {
                 await interaction.editReply(`✅ ${todoIds.length}件のTODOを一括で完了にしました！`);
                 await showDashboard(interaction.channel, lastDashboardMessage, false);
                 setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
+                return;
+            }
+            
+            if (interaction.customId.startsWith('select_remind_')) {
+                const parts = interaction.customId.split('_');
+                const todoId = parts[2];
+                const isResched = parts[3];
+                const timestamp = parts[4];
+                
+                const selected = interaction.values.length > 0 ? interaction.values.join('-') : 'none';
+                
+                const newConfirmBtn = new ButtonBuilder()
+                    .setCustomId(`confirm_remind_${todoId}_${isResched}_${timestamp}_${selected}`)
+                    .setLabel('確定して予定化')
+                    .setStyle(ButtonStyle.Primary);
+                
+                const currentSelectMenu = new StringSelectMenuBuilder()
+                    .setCustomId(interaction.customId)
+                    .setPlaceholder('リマインドを選択（複数可）')
+                    .setMinValues(0)
+                    .setMaxValues(3)
+                    .addOptions(
+                        new StringSelectMenuOptionBuilder().setLabel('10分前').setValue('10m').setDefault(interaction.values.includes('10m')),
+                        new StringSelectMenuOptionBuilder().setLabel('1時間前').setValue('1h').setDefault(interaction.values.includes('1h')),
+                        new StringSelectMenuOptionBuilder().setLabel('フリー設定').setValue('free').setDefault(interaction.values.includes('free'))
+                    );
+
+                await interaction.update({
+                    components: [
+                        new ActionRowBuilder().addComponents(currentSelectMenu),
+                        new ActionRowBuilder().addComponents(newConfirmBtn)
+                    ]
+                });
                 return;
             }
 
@@ -812,6 +906,42 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
         }
+        
+        if (interaction.isButton()) {
+            if (interaction.customId.startsWith('confirm_remind_')) {
+                const parts = interaction.customId.split('_');
+                const todoId = parts[2];
+                const isResched = parts[3] === '1';
+                const timestamp = parseInt(parts[4], 10);
+                const selectedStr = parts[5] || 'none';
+                const isoStr = new Date(timestamp).toISOString();
+
+                if (selectedStr.includes('free')) {
+                    const modal = new ModalBuilder()
+                        .setCustomId(`modal_free_remind_${todoId}_${isResched ? 1 : 0}_${timestamp}_${selectedStr}`)
+                        .setTitle('フリーリマインド日時の設定');
+                    const datetimeInput = new TextInputBuilder()
+                        .setCustomId('free_datetime')
+                        .setLabel('リマインド日時を入力 (4桁/8桁/12桁)')
+                        .setStyle(TextInputStyle.Short)
+                        .setPlaceholder('例: 07151200 (月日や年月日時分)')
+                        .setRequired(true)
+                        .setMaxLength(12);
+                    modal.addComponents(new ActionRowBuilder().addComponents(datetimeInput));
+                    await interaction.showModal(modal);
+                    return;
+                }
+
+                const reminderOverrides = [];
+                const selectedOptions = selectedStr.split('-');
+                if (selectedOptions.includes('10m')) reminderOverrides.push({ method: 'popup', minutes: 10 });
+                if (selectedOptions.includes('1h')) reminderOverrides.push({ method: 'popup', minutes: 60 });
+
+                await interaction.deferReply({ ephemeral: true });
+                await executeSchedule(interaction, todoId, isResched, isoStr, reminderOverrides);
+                return;
+            }
+        }
 
         if (interaction.isModalSubmit()) {
             if (interaction.customId.startsWith('modal_exec_') || interaction.customId.startsWith('modal_resched_')) {
@@ -863,68 +993,104 @@ client.on('interactionCreate', async interaction => {
                     return;
                 }
 
-                await interaction.deferReply({ ephemeral: true });
-
-                const res = await pool.query("SELECT title, calendar_event_id, scheduled_at FROM todos WHERE id = $1", [todoId]);
-                if (res.rows.length === 0) {
-                    await interaction.editReply('❌ TODOが見つかりません。');
-                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
-                    return;
-                }
-                const { title, calendar_event_id, scheduled_at } = res.rows[0];
-
-                if (isResched) {
-                    if (!calendar_event_id) {
-                        await interaction.editReply('❌ 連携されたカレンダー情報が見つかりません。');
-                        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
-                        return;
-                    }
-                    //  修正後
-const success = await calendar.updateEvent(calendar_event_id, title, isoStr);
-if (!success) {
-                        await interaction.editReply('❌ Googleカレンダーの更新に失敗しました。');
-                        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
-                        return;
-                    }
-                    await pool.query(
-                        "UPDATE todos SET scheduled_at = $1 WHERE id = $2",
-                        [dateObj.toISOString(), todoId]
-                    );
-                    await pool.query(
-                        "INSERT INTO actions (todo_id, action_type, action_at, from_time, to_time) VALUES ($1, 'rescheduled', CURRENT_TIMESTAMP, $2, $3)",
-                        [todoId, scheduled_at, dateObj.toISOString()]
-                    );
-                } else {
-                    const eventId = await calendar.addEvent(title, isoStr);
-                    if (!eventId) {
-                        await interaction.editReply('❌ Googleカレンダーの登録に失敗しました。');
-                        setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
-                        return;
-                    }
-                    await pool.query(
-                        "UPDATE todos SET status = 'scheduled', scheduled_at = $1, calendar_event_id = $2 WHERE id = $3",
-                        [dateObj.toISOString(), eventId, todoId]
-                    );
-                    await pool.query(
-                        "INSERT INTO actions (todo_id, action_type, action_at) VALUES ($1, 'scheduled', CURRENT_TIMESTAMP)",
-                        [todoId]
-                    );
-                }
-
                 const days = ['日', '月', '火', '水', '木', '金', '土'];
                 const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
                 const dayStr = days[dayOfWeek];
                 const timeMsg = `**${year}年${month}月${day}日（${dayStr}）${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}**`;
 
-                if (isResched) {
-                    await interaction.editReply(`✅ Googleカレンダーの予定を ${timeMsg} にリスケしました！`);
-                } else {
-                    await interaction.editReply(`✅ ${timeMsg} でGoogleカレンダーに予定を登録し、予定済み一覧へ移動しました！`);
-                }
-                await showDashboard(interaction.channel, lastDashboardMessage, false);
-                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
+                const selectMenu = new StringSelectMenuBuilder()
+                    .setCustomId(`select_remind_${todoId}_${isResched ? '1' : '0'}_${dateObj.getTime()}`)
+                    .setPlaceholder('リマインドを選択（複数可）')
+                    .setMinValues(0)
+                    .setMaxValues(3)
+                    .addOptions(
+                        new StringSelectMenuOptionBuilder().setLabel('10分前').setValue('10m'),
+                        new StringSelectMenuOptionBuilder().setLabel('1時間前').setValue('1h'),
+                        new StringSelectMenuOptionBuilder().setLabel('フリー設定').setValue('free')
+                    );
+                
+                const confirmBtn = new ButtonBuilder()
+                    .setCustomId(`confirm_remind_${todoId}_${isResched ? '1' : '0'}_${dateObj.getTime()}_none`)
+                    .setLabel('確定して予定化')
+                    .setStyle(ButtonStyle.Primary);
+                
+                await interaction.reply({
+                    content: `📅 予定日時: ${timeMsg}\nリマインド設定を選択してください。`,
+                    components: [
+                        new ActionRowBuilder().addComponents(selectMenu),
+                        new ActionRowBuilder().addComponents(confirmBtn)
+                    ],
+                    ephemeral: true
+                });
                 return;
             }
+        }
+        
+        if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_free_remind_')) {
+            const parts = interaction.customId.split('_');
+            const todoId = parts[3];
+            const isResched = parts[4] === '1';
+            const timestamp = parseInt(parts[5], 10);
+            const selectedStr = parts[6] || 'none';
+            const isoStr = new Date(timestamp).toISOString();
+            
+            let inputStr = interaction.fields.getTextInputValue('free_datetime').trim();
+            const now = new Date();
+            const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+            const jstNow = new Date(utc + 9 * 3600000);
+            
+            if (!/^(\d{4}|\d{8}|\d{12})$/.test(inputStr)) {
+                await interaction.reply({ content: '❌ フォーマットが間違っています。4桁、8桁、または12桁の半角数字で入力してください。', ephemeral: true });
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                return;
+            }
+            
+            let year = jstNow.getFullYear();
+            let month = jstNow.getMonth() + 1;
+            let day = jstNow.getDate();
+            let hour = 0;
+            let min = 0;
+
+            if (inputStr.length === 4) {
+                hour = parseInt(inputStr.substring(0, 2), 10);
+                min = parseInt(inputStr.substring(2, 4), 10);
+            } else if (inputStr.length === 8) {
+                month = parseInt(inputStr.substring(0, 2), 10);
+                day = parseInt(inputStr.substring(2, 4), 10);
+                hour = parseInt(inputStr.substring(4, 6), 10);
+                min = parseInt(inputStr.substring(6, 8), 10);
+            } else if (inputStr.length === 12) {
+                year = parseInt(inputStr.substring(0, 4), 10);
+                month = parseInt(inputStr.substring(4, 6), 10);
+                day = parseInt(inputStr.substring(6, 8), 10);
+                hour = parseInt(inputStr.substring(8, 10), 10);
+                min = parseInt(inputStr.substring(10, 12), 10);
+            }
+            
+            const freeIsoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
+            const freeDateObj = new Date(freeIsoStr);
+            if (isNaN(freeDateObj.getTime())) {
+                await interaction.reply({ content: '❌ 無効な日時です。', ephemeral: true });
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                return;
+            }
+
+            const freeMinutes = Math.floor((timestamp - freeDateObj.getTime()) / 60000);
+            if (freeMinutes < 0) {
+                await interaction.reply({ content: '❌ リマインド日時は予定日時よりも前に設定してください。', ephemeral: true });
+                setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                return;
+            }
+
+            const reminderOverrides = [];
+            const selectedOptions = selectedStr.split('-');
+            if (selectedOptions.includes('10m')) reminderOverrides.push({ method: 'popup', minutes: 10 });
+            if (selectedOptions.includes('1h')) reminderOverrides.push({ method: 'popup', minutes: 60 });
+            reminderOverrides.push({ method: 'popup', minutes: freeMinutes });
+
+            await interaction.deferReply({ ephemeral: true });
+            await executeSchedule(interaction, todoId, isResched, isoStr, reminderOverrides);
+            return;
         }
     } catch (err) {
         console.error("Interaction Error:", err);
