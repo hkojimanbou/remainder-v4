@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { pool } = require('./db');
+const calendar = require('./calendar');
 const { Anthropic } = require('@anthropic-ai/sdk');
 
 const anthropic = new Anthropic({
@@ -96,22 +97,82 @@ app.post('/api/macro-todo', async (req, res) => {
         return res.status(400).json({ error: 'Bad Request' });
     }
 
-    const cleanTitle = text.trim();
-    if (cleanTitle.length === 0) {
+    const titleText = text.trim();
+    if (titleText.length === 0) {
         return res.status(400).json({ error: 'Text is empty' });
     }
 
-    try {
-        const result = await pool.query(
-            "INSERT INTO todos (title, status) VALUES ($1, 'pending') RETURNING *",
-            [cleanTitle]
-        );
-        const newTodo = result.rows[0];
+    const shortcutMatch = titleText.match(/^(.*?)(?:[\s　]+)?(\d{4}|\d{6}|\d{8}|\d{12})$/);
+    let isShortcutValid = false;
+    let dateObj = null;
+    let isoStr = '';
+    let finalTitle = titleText;
 
-        await pool.query(
-            "INSERT INTO actions (todo_id, action_type) VALUES ($1, 'created')",
-            [newTodo.id]
-        );
+    if (shortcutMatch) {
+        finalTitle = shortcutMatch[1].trim();
+        const inputStr = shortcutMatch[2];
+        
+        const now = new Date();
+        const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+        const jstNow = new Date(utc + 9 * 3600000);
+
+        let year = jstNow.getFullYear();
+        let month = jstNow.getMonth() + 1;
+        let day = jstNow.getDate();
+        let hour = 0;
+        let min = 0;
+
+        if (inputStr.length === 4) {
+            hour = parseInt(inputStr.substring(0, 2), 10);
+            min = parseInt(inputStr.substring(2, 4), 10);
+        } else if (inputStr.length === 6) {
+            day = parseInt(inputStr.substring(0, 2), 10);
+            hour = parseInt(inputStr.substring(2, 4), 10);
+            min = parseInt(inputStr.substring(4, 6), 10);
+        } else if (inputStr.length === 8) {
+            month = parseInt(inputStr.substring(0, 2), 10);
+            day = parseInt(inputStr.substring(2, 4), 10);
+            hour = parseInt(inputStr.substring(4, 6), 10);
+            min = parseInt(inputStr.substring(6, 8), 10);
+        } else if (inputStr.length === 12) {
+            year = parseInt(inputStr.substring(0, 4), 10);
+            month = parseInt(inputStr.substring(4, 6), 10);
+            day = parseInt(inputStr.substring(6, 8), 10);
+            hour = parseInt(inputStr.substring(8, 10), 10);
+            min = parseInt(inputStr.substring(10, 12), 10);
+        }
+        
+        isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
+        dateObj = new Date(isoStr);
+        
+        if (!isNaN(dateObj.getTime()) && finalTitle.length > 0 && hour >= 0 && hour <= 23 && min >= 0 && min <= 59 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            isShortcutValid = true;
+        } else {
+            finalTitle = titleText;
+        }
+    }
+
+    try {
+        let newTodo;
+        if (isShortcutValid) {
+            const eventId = await calendar.addEvent(finalTitle, isoStr);
+            const result = await pool.query(
+                "INSERT INTO todos (title, status, scheduled_at, calendar_event_id) VALUES ($1, 'scheduled', $2, $3) RETURNING *",
+                [finalTitle, dateObj.toISOString(), eventId]
+            );
+            newTodo = result.rows[0];
+
+            await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'created')", [newTodo.id]);
+            await pool.query("INSERT INTO actions (todo_id, action_type, action_at) VALUES ($1, 'scheduled', CURRENT_TIMESTAMP)", [newTodo.id]);
+        } else {
+            const result = await pool.query(
+                "INSERT INTO todos (title, status) VALUES ($1, 'pending') RETURNING *",
+                [finalTitle]
+            );
+            newTodo = result.rows[0];
+
+            await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'created')", [newTodo.id]);
+        }
 
         macroEvent.emit('newTodo', newTodo);
         res.status(201).json({ success: true, todo: newTodo });

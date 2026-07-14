@@ -154,6 +154,7 @@ async function showDashboard(channel, messageToEdit = null, allowNew = true) {
             return `#${t.id} ${t.title} (${timeStr})`;
         };
 
+        const truncateField = (text) => text.length > 1024 ? text.substring(0, 1021) + '...' : text;
         const pendingText = pendingTodos.length > 0 ? pendingTodos.map(t => formatTodo(t, 'pending')).join('\n') : "なし";
         const scheduledText = scheduledTodos.length > 0 ? scheduledTodos.map(t => formatTodo(t, 'scheduled')).join('\n') : "なし";
         const risukeText = risukeTodos.length > 0 ? risukeTodos.map(t => formatTodo(t, t.status === 'done' ? 'done' : 'overdue')).join('\n') : "なし";
@@ -162,9 +163,9 @@ async function showDashboard(channel, messageToEdit = null, allowNew = true) {
             .setTitle('📋 統合ダッシュボード')
             .setColor(0x0099FF)
             .addFields(
-                { name: '📝 未定', value: pendingText },
-                { name: '📅 予定', value: scheduledText },
-                { name: '🔄 リスケする？', value: risukeText }
+                { name: '📝 未定', value: truncateField(pendingText) },
+                { name: '📅 予定', value: truncateField(scheduledText) },
+                { name: '🔄 リスケする？', value: truncateField(risukeText) }
             );
 
         const options = [];
