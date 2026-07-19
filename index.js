@@ -209,10 +209,16 @@ async function showDashboard(channel, messageToEdit = null, allowNew = true) {
                 .addOptions(finalOptions);
             const row3 = new ActionRowBuilder().addComponents(bulkCompleteMenu);
 
+            const markdoneMenu = new StringSelectMenuBuilder()
+                .setCustomId('dashboard_markdone_todo')
+                .setPlaceholder('✅ 完了済みとして登録するTODOを選択')
+                .addOptions(finalOptions);
+            const row_markdone = new ActionRowBuilder().addComponents(markdoneMenu);
+
             if (messageToEdit) {
-                await messageToEdit.edit({ content: '', embeds: [embed], components: [row1, row3, row2, closeBtnRow] }).catch(() => {});
+                await messageToEdit.edit({ content: '', embeds: [embed], components: [row1, row_markdone, row3, row2, closeBtnRow] }).catch(() => {});
             } else if (allowNew) {
-                lastDashboardMessage = await channel.send({ embeds: [embed], components: [row1, row3, row2, closeBtnRow] });
+                lastDashboardMessage = await channel.send({ embeds: [embed], components: [row1, row_markdone, row3, row2, closeBtnRow] });
             }
         } else {
             if (messageToEdit) {
@@ -488,6 +494,33 @@ client.on('interactionCreate', async interaction => {
 
     try {
         if (interaction.isStringSelectMenu()) {
+            if (interaction.customId === 'dashboard_markdone_todo') {
+                const todoId = interaction.values[0];
+                const now = new Date();
+                const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                const jstNow = new Date(utc + (9 * 3600000));
+                
+                const pad = n => n.toString().padStart(2, '0');
+                const defaultTime = `${jstNow.getFullYear()}${pad(jstNow.getMonth()+1)}${pad(jstNow.getDate())}${pad(jstNow.getHours())}${pad(jstNow.getMinutes())}`;
+
+                const modal = new ModalBuilder()
+                    .setCustomId(`modal_markdone_${todoId}`)
+                    .setTitle('完了日時の入力');
+                
+                const timeInput = new TextInputBuilder()
+                    .setCustomId('done_time')
+                    .setLabel('完了日時 (4桁/6桁/8桁/12桁)')
+                    .setStyle(TextInputStyle.Short)
+                    .setValue(defaultTime)
+                    .setRequired(true)
+                    .setMaxLength(12);
+                    
+                const actionRow = new ActionRowBuilder().addComponents(timeInput);
+                modal.addComponents(actionRow);
+                await interaction.showModal(modal);
+                return;
+            }
+
             if (interaction.customId === 'dashboard_bulk_cancel') {
                 const todoIds = interaction.values;
                 await interaction.deferUpdate();
@@ -617,7 +650,6 @@ client.on('interactionCreate', async interaction => {
                 if (category === 'pending') {
                     options.push(
                         new StringSelectMenuOptionBuilder().setLabel('🗓️ 計画する').setValue(`action_plan_${todoId}`),
-                        new StringSelectMenuOptionBuilder().setLabel('✅ 完了済みとして登録').setValue(`action_markdone_${todoId}`),
                         new StringSelectMenuOptionBuilder().setLabel('⏸️ 保留（後回し）').setValue(`action_hold_${todoId}`),
                         new StringSelectMenuOptionBuilder().setLabel('❌ 取止め').setValue(`action_cancel_${todoId}`)
                     );
@@ -654,32 +686,6 @@ client.on('interactionCreate', async interaction => {
                 const parts = actionValue.split('_');
                 const action = parts[1];
                 const todoId = parts[2];
-
-                if (action === 'markdone') {
-                    const now = new Date();
-                    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-                    const jstNow = new Date(utc + (9 * 3600000));
-                    
-                    const pad = n => n.toString().padStart(2, '0');
-                    const defaultTime = `${jstNow.getFullYear()}${pad(jstNow.getMonth()+1)}${pad(jstNow.getDate())}${pad(jstNow.getHours())}${pad(jstNow.getMinutes())}`;
-
-                    const modal = new ModalBuilder()
-                        .setCustomId(`modal_markdone_${todoId}`)
-                        .setTitle('完了日時の入力');
-                    
-                    const timeInput = new TextInputBuilder()
-                        .setCustomId('done_time')
-                        .setLabel('完了日時 (4桁/6桁/8桁/12桁)')
-                        .setStyle(TextInputStyle.Short)
-                        .setValue(defaultTime)
-                        .setRequired(true)
-                        .setMaxLength(12);
-                        
-                    const actionRow = new ActionRowBuilder().addComponents(timeInput);
-                    modal.addComponents(actionRow);
-                    await interaction.showModal(modal);
-                    return;
-                }
 
                 if (action === 'plan') {
                     const now = new Date();
