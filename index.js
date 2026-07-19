@@ -617,6 +617,7 @@ client.on('interactionCreate', async interaction => {
                 if (category === 'pending') {
                     options.push(
                         new StringSelectMenuOptionBuilder().setLabel('🗓️ 計画する').setValue(`action_plan_${todoId}`),
+                        new StringSelectMenuOptionBuilder().setLabel('✅ 完了済みとして登録').setValue(`action_markdone_${todoId}`),
                         new StringSelectMenuOptionBuilder().setLabel('⏸️ 保留（後回し）').setValue(`action_hold_${todoId}`),
                         new StringSelectMenuOptionBuilder().setLabel('❌ 取止め').setValue(`action_cancel_${todoId}`)
                     );
@@ -653,6 +654,32 @@ client.on('interactionCreate', async interaction => {
                 const parts = actionValue.split('_');
                 const action = parts[1];
                 const todoId = parts[2];
+
+                if (action === 'markdone') {
+                    const now = new Date();
+                    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                    const jstNow = new Date(utc + (9 * 3600000));
+                    
+                    const pad = n => n.toString().padStart(2, '0');
+                    const defaultTime = `${jstNow.getFullYear()}${pad(jstNow.getMonth()+1)}${pad(jstNow.getDate())}${pad(jstNow.getHours())}${pad(jstNow.getMinutes())}`;
+
+                    const modal = new ModalBuilder()
+                        .setCustomId(`modal_markdone_${todoId}`)
+                        .setTitle('完了日時の入力');
+                    
+                    const timeInput = new TextInputBuilder()
+                        .setCustomId('done_time')
+                        .setLabel('完了日時 (4桁/6桁/8桁/12桁)')
+                        .setStyle(TextInputStyle.Short)
+                        .setValue(defaultTime)
+                        .setRequired(true)
+                        .setMaxLength(12);
+                        
+                    const actionRow = new ActionRowBuilder().addComponents(timeInput);
+                    modal.addComponents(actionRow);
+                    await interaction.showModal(modal);
+                    return;
+                }
 
                 if (action === 'plan') {
                     const now = new Date();
@@ -784,8 +811,21 @@ client.on('interactionCreate', async interaction => {
                 pendingBulkActions.delete(actionId);
 
                 try {
+                    const now = new Date();
+                    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+                    const jst = new Date(utc + 9 * 3600000);
+                    const todayMidnightIso = `${jst.getFullYear()}-${(jst.getMonth()+1).toString().padStart(2, '0')}-${jst.getDate().toString().padStart(2, '0')}T00:00:00+09:00`;
+                    
                     for (const todoId of todoIds) {
-                        await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
+                        const res = await pool.query("SELECT title FROM todos WHERE id = $1", [todoId]);
+                        if (res.rows.length > 0) {
+                            const title = res.rows[0].title;
+                            calendar.addEvent(title, todayMidnightIso, []).then(eventId => {
+                                pool.query("UPDATE todos SET calendar_event_id = $1 WHERE id = $2", [eventId, todoId]).catch(e => console.error(e));
+                            }).catch(e => console.error('Bulk calendar add error:', e));
+                        }
+
+                        await pool.query("UPDATE todos SET status = 'done', scheduled_at = $1 WHERE id = $2", [new Date(todayMidnightIso).toISOString(), todoId]);
                         await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
                         syncTaskToList(todoId, '思い付き完了リスト', true).catch(e => console.error('Task sync error:', e));
                     }
@@ -1036,6 +1076,84 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (interaction.isModalSubmit()) {
+            if (interaction.customId.startsWith('modal_markdone_')) {
+                const todoId = interaction.customId.split('_')[2];
+                let inputStr = interaction.fields.getTextInputValue('done_time').trim();
+                
+                const now = new Date();
+                const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+                const jstNow = new Date(utc + 9 * 3600000);
+                
+                if (!inputStr) {
+                    inputStr = `${jstNow.getFullYear()}${(jstNow.getMonth() + 1).toString().padStart(2, '0')}${jstNow.getDate().toString().padStart(2, '0')}${jstNow.getHours().toString().padStart(2, '0')}${jstNow.getMinutes().toString().padStart(2, '0')}`;
+                }
+
+                if (!/^(\d{4}|\d{6}|\d{8}|\d{12})$/.test(inputStr)) {
+                    await interaction.reply({ content: '❌ フォーマットが間違っています。4桁、6桁、8桁、または12桁の半角数字で入力してください。', ephemeral: true });
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
+                }
+                
+                let year = jstNow.getFullYear();
+                let month = jstNow.getMonth() + 1;
+                let day = jstNow.getDate();
+                let hour, min;
+
+                if (inputStr.length === 4) {
+                    hour = parseInt(inputStr.substring(0, 2), 10);
+                    min = parseInt(inputStr.substring(2, 4), 10);
+                } else if (inputStr.length === 6) {
+                    day = parseInt(inputStr.substring(0, 2), 10);
+                    hour = parseInt(inputStr.substring(2, 4), 10);
+                    min = parseInt(inputStr.substring(4, 6), 10);
+                } else if (inputStr.length === 8) {
+                    month = parseInt(inputStr.substring(0, 2), 10);
+                    day = parseInt(inputStr.substring(2, 4), 10);
+                    hour = parseInt(inputStr.substring(4, 6), 10);
+                    min = parseInt(inputStr.substring(6, 8), 10);
+                } else if (inputStr.length === 12) {
+                    year = parseInt(inputStr.substring(0, 4), 10);
+                    month = parseInt(inputStr.substring(4, 6), 10);
+                    day = parseInt(inputStr.substring(6, 8), 10);
+                    hour = parseInt(inputStr.substring(8, 10), 10);
+                    min = parseInt(inputStr.substring(10, 12), 10);
+                }
+                
+                const isoStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00+09:00`;
+                const dateObj = new Date(isoStr);
+                if (isNaN(dateObj.getTime())) {
+                    await interaction.reply({ content: '❌ 無効な日時です。', ephemeral: true });
+                    setTimeout(() => interaction.deleteReply().catch(() => {}), 3000);
+                    return;
+                }
+
+                await interaction.deferUpdate().catch(() => {});
+                
+                try {
+                    const res = await pool.query("SELECT title FROM todos WHERE id = $1", [todoId]);
+                    if (res.rows.length === 0) return;
+                    const title = res.rows[0].title;
+                    
+                    const eventId = await calendar.addEvent(title, isoStr, []);
+                    
+                    await pool.query(
+                        "UPDATE todos SET status = 'done', scheduled_at = $1, calendar_event_id = $2 WHERE id = $3",
+                        [dateObj.toISOString(), eventId, todoId]
+                    );
+                    await pool.query(
+                        "INSERT INTO actions (todo_id, action_type, action_at) VALUES ($1, 'done', CURRENT_TIMESTAMP)",
+                        [todoId]
+                    );
+                    
+                    await interaction.followUp({ content: `✅ 「${title}」を完了済みとしてカレンダーに登録しました！`, ephemeral: true });
+                    await showDashboard(interaction.channel, lastDashboardMessage, false);
+                } catch (err) {
+                    console.error('Markdone Error:', err);
+                    await interaction.followUp({ content: `❌ エラーが発生しました: ${err.message}`, ephemeral: true });
+                }
+                return;
+            }
+
             if (interaction.customId.startsWith('modal_exec_') || interaction.customId.startsWith('modal_resched_')) {
                 const isResched = interaction.customId.startsWith('modal_resched_');
                 const todoId = interaction.customId.split('_')[2];
