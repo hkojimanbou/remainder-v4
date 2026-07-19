@@ -8,6 +8,8 @@ const { startServer, macroEvent } = require('./web');
 let lastDashboardChannel = null;
 let lastDashboardMessage = null;
 
+const pendingBulkActions = new Map();
+
 async function syncTaskToList(todoId, listName, isCompleted) {
     try {
         const res = await pool.query("SELECT title FROM todos WHERE id = $1", [todoId]);
@@ -488,41 +490,71 @@ client.on('interactionCreate', async interaction => {
         if (interaction.isStringSelectMenu()) {
             if (interaction.customId === 'dashboard_bulk_cancel') {
                 const todoIds = interaction.values;
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferUpdate();
 
-                for (const todoId of todoIds) {
-                    const res = await pool.query("SELECT calendar_event_id FROM todos WHERE id = $1", [todoId]);
-                    if (res.rows.length > 0 && res.rows[0].calendar_event_id) {
-                        try {
-                            await calendar.deleteEvent(res.rows[0].calendar_event_id);
-                        } catch (e) {
-                            console.error('Calendar bulk delete error:', e);
-                        }
-                    }
-                    await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
-                    await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
-                    await syncTaskToList(todoId, '取止め', false);
+                if (!lastDashboardMessage && interaction.message) {
+                    lastDashboardMessage = interaction.message;
+                    lastDashboardChannel = interaction.channel;
                 }
 
-                await interaction.editReply(`🗑️ ${todoIds.length}件のTODOを一括で取り止めました！`);
-                await showDashboard(interaction.channel, lastDashboardMessage, false);
-                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
+                try {
+                    const res = await pool.query("SELECT id, title FROM todos WHERE id = ANY($1::int[])", [todoIds]);
+                    const titles = res.rows.map(r => `・${r.title}`).join('\n');
+                    
+                    const actionId = Date.now().toString();
+                    pendingBulkActions.set(actionId, todoIds);
+
+                    const confirmBtn = new ButtonBuilder()
+                        .setCustomId(`bulk_cancel_confirm_${actionId}`)
+                        .setLabel('🗑️ 一括取止めを確定')
+                        .setStyle(ButtonStyle.Danger);
+                    
+                    const row = new ActionRowBuilder().addComponents(confirmBtn);
+
+                    await interaction.followUp({ 
+                        content: `以下のTODOを一括取止めしますか？\n${titles}`, 
+                        components: [row],
+                        ephemeral: true 
+                    });
+                } catch (e) {
+                    console.error('Bulk cancel confirm error:', e);
+                    await interaction.followUp({ content: `❌ エラーが発生しました: ${e.message}`, ephemeral: true });
+                }
                 return;
             }
 
             if (interaction.customId === 'dashboard_bulk_complete') {
                 const todoIds = interaction.values;
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferUpdate();
 
-                for (const todoId of todoIds) {
-                    await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
-                    await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
-                    await syncTaskToList(todoId, '思い付き完了リスト', true);
+                if (!lastDashboardMessage && interaction.message) {
+                    lastDashboardMessage = interaction.message;
+                    lastDashboardChannel = interaction.channel;
                 }
 
-                await interaction.editReply(`✅ ${todoIds.length}件のTODOを一括で完了にしました！`);
-                await showDashboard(interaction.channel, lastDashboardMessage, false);
-                setTimeout(() => interaction.deleteReply().catch(() => {}), 40000);
+                try {
+                    const res = await pool.query("SELECT id, title FROM todos WHERE id = ANY($1::int[])", [todoIds]);
+                    const titles = res.rows.map(r => `・${r.title}`).join('\n');
+                    
+                    const actionId = Date.now().toString();
+                    pendingBulkActions.set(actionId, todoIds);
+
+                    const confirmBtn = new ButtonBuilder()
+                        .setCustomId(`bulk_complete_confirm_${actionId}`)
+                        .setLabel('✅ 一括完了を確定')
+                        .setStyle(ButtonStyle.Success);
+                    
+                    const row = new ActionRowBuilder().addComponents(confirmBtn);
+
+                    await interaction.followUp({ 
+                        content: `以下のTODOを一括完了しますか？\n${titles}`, 
+                        components: [row],
+                        ephemeral: true 
+                    });
+                } catch (e) {
+                    console.error('Bulk complete confirm error:', e);
+                    await interaction.followUp({ content: `❌ エラーが発生しました: ${e.message}`, ephemeral: true });
+                }
                 return;
             }
             
@@ -704,6 +736,66 @@ client.on('interactionCreate', async interaction => {
             if (customId === 'dashboard_close') {
                 await interaction.deferUpdate().catch(console.error);
                 await interaction.message.delete().catch(console.error);
+                return;
+            }
+
+            if (customId.startsWith('bulk_cancel_confirm_')) {
+                const actionId = customId.replace('bulk_cancel_confirm_', '');
+                const todoIds = pendingBulkActions.get(actionId);
+                
+                await interaction.deferUpdate();
+                if (!todoIds) {
+                    await interaction.editReply({ content: '❌ セッションの有効期限が切れました。再度お試しください。', components: [] });
+                    return;
+                }
+                
+                pendingBulkActions.delete(actionId);
+
+                try {
+                    for (const todoId of todoIds) {
+                        const res = await pool.query("SELECT calendar_event_id FROM todos WHERE id = $1", [todoId]);
+                        if (res.rows.length > 0 && res.rows[0].calendar_event_id) {
+                            calendar.deleteEvent(res.rows[0].calendar_event_id).catch(e => console.error('Calendar bulk delete error:', e));
+                        }
+                        await pool.query("UPDATE todos SET status = 'cancelled' WHERE id = $1", [todoId]);
+                        await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'cancelled')", [todoId]);
+                        syncTaskToList(todoId, '取止め', false).catch(e => console.error('Task sync error:', e));
+                    }
+
+                    await showDashboard(interaction.channel, lastDashboardMessage, false);
+                    await interaction.editReply({ content: `🗑️ ${todoIds.length}件のTODOを一括で取り止めました！`, components: [] });
+                } catch (e) {
+                    console.error('Bulk cancel exec error:', e);
+                    await interaction.editReply({ content: `❌ 一括取止め中にエラーが発生しました: ${e.message}`, components: [] });
+                }
+                return;
+            }
+
+            if (customId.startsWith('bulk_complete_confirm_')) {
+                const actionId = customId.replace('bulk_complete_confirm_', '');
+                const todoIds = pendingBulkActions.get(actionId);
+                
+                await interaction.deferUpdate();
+                if (!todoIds) {
+                    await interaction.editReply({ content: '❌ セッションの有効期限が切れました。再度お試しください。', components: [] });
+                    return;
+                }
+                
+                pendingBulkActions.delete(actionId);
+
+                try {
+                    for (const todoId of todoIds) {
+                        await pool.query("UPDATE todos SET status = 'done' WHERE id = $1", [todoId]);
+                        await pool.query("INSERT INTO actions (todo_id, action_type) VALUES ($1, 'done')", [todoId]);
+                        syncTaskToList(todoId, '思い付き完了リスト', true).catch(e => console.error('Task sync error:', e));
+                    }
+
+                    await showDashboard(interaction.channel, lastDashboardMessage, false);
+                    await interaction.editReply({ content: `✅ ${todoIds.length}件のTODOを一括で完了にしました！`, components: [] });
+                } catch (e) {
+                    console.error('Bulk complete exec error:', e);
+                    await interaction.editReply({ content: `❌ 一括完了中にエラーが発生しました: ${e.message}`, components: [] });
+                }
                 return;
             }
 
@@ -1109,7 +1201,36 @@ client.login(process.env.DISCORD_TOKEN);
 startServer(process.env.PORT || 3000);
 
 macroEvent.on('newTodo', async (todo) => {
-    if (lastDashboardChannel) {
-        await showDashboard(lastDashboardChannel, lastDashboardMessage, false);
+    let channel = lastDashboardChannel;
+    if (!channel && process.env.DISCORD_CHANNEL_ID) {
+        try {
+            channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+            lastDashboardChannel = channel;
+        } catch (e) {
+            console.error('Failed to fetch DISCORD_CHANNEL_ID', e);
+        }
+    }
+
+    if (channel) {
+        let msgText = '';
+        if (todo.status === 'scheduled') {
+            msgText = `🎙️ **登録:** 「${todo.title}」を予定に追加しました！`;
+        } else {
+            msgText = `🎙️ **登録:** 「${todo.title}」を未定TODOに追加しました！`;
+        }
+        await channel.send(msgText);
+
+        if (!lastDashboardMessage) {
+            try {
+                const messages = await channel.messages.fetch({ limit: 20 });
+                const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title === '📋 統合ダッシュボード');
+                if (botMsg) {
+                    lastDashboardMessage = botMsg;
+                }
+            } catch (e) {
+                console.error('Failed to fetch recent messages', e);
+            }
+        }
+        await showDashboard(channel, lastDashboardMessage, true);
     }
 });
